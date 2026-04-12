@@ -3,7 +3,7 @@
 """
 
 import pygame
-from __init__ import GRID_SIZE, GREEN, BLUE, RED,WHITE
+from __init__ import GRID_SIZE, GREEN, BLUE, RED, WHITE
 
 class GameObject:
     """基础游戏对象类"""
@@ -43,9 +43,14 @@ class Bullet(GameObject):
         self.damage = 1 + level  # 伤害随等级增加
         self.player = player
         self.side = side  # 哪个部位发射的（left, right, None）
+        self.is_stopped = False  # 子弹是否停止
+        self.stop_timer = 0  # 停止后的存在时间
+        self.max_stop_time = 300  # 最多停留300帧（5秒）
     
     def update(self, game_world):
         """更新子弹位置"""
+
+        
         # 根据方向移动
         if self.direction == "left":
             self.x -= self.speed / GRID_SIZE
@@ -59,8 +64,25 @@ class Bullet(GameObject):
         # 检查是否出界
         if (self.x < 0 or self.x >= game_world.width or 
             self.y < 0 or self.y >= game_world.height):
-            # 子弹消失，回收对应部位
-            self.player.recover_part(self.bullet_type, self.side)
-            return False
+            # 子弹停止在边界
+            self.stop()
+            return True
+        
+        # 检查是否击中场景物体
+        for obj in game_world.get_scene_objects():
+            if obj.collidable and self.rect.colliderect(obj.rect):
+                # 子弹停止在障碍前
+                self.stop()
+                return True
         
         return True
+    
+    def stop(self):
+        """停止子弹"""
+        self.is_stopped = True
+        self.speed = 0
+    
+    def clear(self):
+        """清除子弹，回收对应部位"""
+        self.player.recover_part(self.bullet_type, self.side)
+        return False

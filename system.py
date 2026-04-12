@@ -50,7 +50,8 @@ class GameSystem:
             
             # 控制帧率
             self.clock.tick(FPS)
-    
+            
+    # 在GameSystem类的handle_keydown方法中修改
     def handle_keydown(self, event):
         """处理键盘按下事件"""
         if self.state == GAME_STATE_MENU:
@@ -92,18 +93,43 @@ class GameSystem:
                 # 返回主菜单
                 self.state = GAME_STATE_MENU
                 self.game_instance = None
-            elif event.key == pygame.K_SPACE:
-                # 发射子弹
+            elif event.key == pygame.K_q:
+                # 切换选择部位
                 if self.game_instance:
-                    self.game_instance.player.attack(self.game_instance.bullets, self.game_instance.world)
+                    self.game_instance.player.select_next_part()
+            elif event.key == pygame.K_j:
+                # 执行当前选中动作
+                if self.game_instance:
+                    result = self.game_instance.player.perform_action(self.game_instance.world)
+                    if result:
+                        # 获取发射的子弹并添加到子弹列表
+                        bullets = self.game_instance.player.get_fired_bullets()
+                        for bullet in bullets:
+                            self.game_instance.bullets.append(bullet)
+            elif event.key == pygame.K_r:
+                # 回收所有身体部位并清除所有子弹
+                if self.game_instance:
+                    # 回收身体部位
+                    self.game_instance.player.recover_all_parts(self.game_instance.world)
+                    # 清除所有子弹
+                    bullets_to_clear = []
+                    for bullet in self.game_instance.bullets:
+                        if bullet.is_stopped:
+                            bullets_to_clear.append(bullet)
+                            bullet.clear()
+                    
+                    # 移除被清除的子弹
+                    for bullet in bullets_to_clear:
+                        if bullet in self.game_instance.bullets:
+                            self.game_instance.bullets.remove(bullet)
             elif event.key == pygame.K_w:
-                # 跳跃
+                # 普通跳跃
                 if self.game_instance:
                     self.game_instance.player.jump(self.game_instance.world)
     def start_game(self):
-        """开始游戏"""
-        self.game_instance = TankGame(self.current_level)
-        self.state = GAME_STATE_PLAYING
+            """开始游戏"""
+            self.game_instance = TankGame(self.current_level)
+            self.state = GAME_STATE_PLAYING
     
     def update(self):
         """更新游戏"""
@@ -289,7 +315,7 @@ class TankGame:
         # 按住空格键连续发射
         if keys[pygame.K_SPACE]:
             self.player.attack(self.bullets, self.world)
-    # 在TankGame的update方法中，修改子弹碰撞检测部分
+        # 在TankGame的update方法中，修改子弹碰撞检测部分
     def update(self):
         """更新游戏状态"""
         if self.state not in [GAME_STATE_PLAYING]:
@@ -331,44 +357,37 @@ class TankGame:
         # 更新子弹
         bullets_to_remove = []
         for bullet in self.bullets:
-            if not bullet.update(self.world):
+            # 更新子弹
+            bullet_active = bullet.update(self.world)
+            
+            if not bullet_active:
                 bullets_to_remove.append(bullet)
                 continue
             
-            # 检查子弹是否击中场景物体
-            bullet_hit_world = False
-            for obj in self.world.get_scene_objects():
-                if obj.collidable and bullet.rect.colliderect(obj.rect):
-                    bullet_hit_world = True
-                    self.show_message("子弹击中障碍！", 10)
-                    break
-            
-            if bullet_hit_world:
-                bullet.player.recover_part(bullet.bullet_type, bullet.side)
-                bullets_to_remove.append(bullet)
-                continue
-            
-            # 检查子弹是否击中敌人
-            enemy_hit = None
-            for enemy in self.enemies:
-                if bullet.rect.colliderect(enemy.rect):
-                    enemy_hit = enemy
-                    break
-            
-            if enemy_hit:
-                if enemy_hit.take_damage(bullet.damage):
-                    self.enemies.remove(enemy_hit)
-                    self.player.gain_exp(enemy_hit.exp_value)
-                    self.score += 10
-                    self.enemies_killed += 1
-                    
-                    self.show_message(f"获得{enemy_hit.exp_value}经验值！", 30)
-                    
-                    if self.enemies_killed % 3 == 0:
-                        self.spawn_enemies(3)
+            # 只检查没有停止的子弹是否击中敌人
+            if not bullet.is_stopped:
+                # 检查子弹是否击中敌人
+                enemy_hit = None
+                for enemy in self.enemies:
+                    if bullet.rect.colliderect(enemy.rect):
+                        enemy_hit = enemy
+                        break
                 
-                bullet.player.recover_part(bullet.bullet_type, bullet.side)
-                bullets_to_remove.append(bullet)
+                if enemy_hit:
+                    if enemy_hit.take_damage(bullet.damage):
+                        self.enemies.remove(enemy_hit)
+                        self.player.gain_exp(enemy_hit.exp_value)
+                        self.score += 10
+                        self.enemies_killed += 1
+                        
+                        self.show_message(f"获得{enemy_hit.exp_value}经验值！", 30)
+                        
+                        if self.enemies_killed % 3 == 0:
+                            self.spawn_enemies(3)
+                    
+                    # 击中敌人后清除子弹
+                    bullets_to_remove.append(bullet)
+                    bullet.clear()
         
         for bullet in bullets_to_remove:
             if bullet in self.bullets:
