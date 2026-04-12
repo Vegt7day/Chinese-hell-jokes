@@ -711,16 +711,14 @@ class ShangYang:
         min_y = 2
         max_y = (game_world.height - 2)
         
-        # 处理水平移动
-        if dx != 0:
-            # 使用碰撞网格查找最近的无碰撞位置
-            safe_x = self.find_horizontal_collision_distance_grid(new_x, game_world, dx)
-            new_x = safe_x
-            
-            # 应用边界限制
-            new_x = max(min_x, min(new_x, max_x))
+        # 应用边界限制
+        new_x = max(min_x, min(new_x, max_x))
+        new_y = max(min_y, min(new_y, max_y))
+        
+        # 存储目标位置
         self.target_x = new_x
-        return False
+        self.target_y = new_y
+        return True
     def jump(self, game_world):
         """普通跳跃"""
         if not self.can_move() or not self.is_jumping and self.on_ground and self.jump_cooldown <= 0:
@@ -867,7 +865,7 @@ class ShangYang:
             self.fall_check_timer = self.fall_check_interval
         
         if not self.on_ground:
-            # 应用重力
+                # 应用重力
             self.vertical_velocity += self.gravity
             target_y = self.y + self.vertical_velocity
             
@@ -876,76 +874,9 @@ class ShangYang:
             max_y = (game_world.height - 2)
             target_y = max(min_y, min(target_y, max_y))
             
-            # 处理下落（垂直速度为正）
-            if self.vertical_velocity > 0:
-                # 使用碰撞网格查找最近的不会碰撞的位置
-                safe_y = self.find_vertical_collision_distance_grid(target_y, game_world, 1)
-                
-                # 检查是否落地
-                if safe_y < target_y:
-                    # 碰到下方障碍
-                    final_y = safe_y
-                    
-                    self.on_ground = True
-                    self.is_jumping = False
-                    self.vertical_velocity = 0
-                    new_y = final_y
-                else:
-                    new_y = target_y
-                    
-            # 处理上升（垂直速度为负）
-            elif self.vertical_velocity < 0:
-                # 使用碰撞网格查找最近的不会碰撞的位置
-                safe_y = self.find_vertical_collision_distance_grid(target_y, game_world, -1)
-                
-                # 检查是否碰到头顶障碍
-                if safe_y > target_y:
-                    # 碰到上方障碍
-                    final_y = safe_y
-                    
-                    self.airborne_movement_allowed = False
-                    self.vertical_velocity = 0
-                    self.is_jumping = False
-                    new_y = final_y
-                else:
-                    new_y = target_y
-                    
-            else:
-                new_y = target_y
-            
-            # 存储目标位置，不立即更新实际位置
-            if new_y != self.y:
-                self.target_y = new_y
-                # 注意：重力只影响y轴，所以x轴保持原位置
-                # self.target_x = self.x
-        
-        # 新机制：当没有腿的时候，如果"鞅"字下方没有障碍物，就保持在原地
-        if legs_separated:
-            # 检查鞅字下方是否有障碍物
-            yang_part = self.body_parts["yang"]
-            below_y = int(yang_part.y) + 1
-            
-            # 获取玩家整数坐标
-            player_center_x = int(self.x)
-            player_center_y = int(self.y)
-            
-            has_below_obstacle = False
-            
-            # 使用碰撞网格检查下方两个格子（避免穿过薄障碍）
-            for y_offset in [1, 2]:  # 检查下方1格和2格
-                check_y = player_center_y + y_offset
-                if 0 <= player_center_x < game_world.width and 0 <= check_y < game_world.height:
-                    if game_world.collision_grid[player_center_x][check_y] == 1:
-                        has_below_obstacle = True
-                        self.on_ground = True
-                        break
-            
-            if not has_below_obstacle:
-                # 鞅字下方没有障碍物，设置为在空中
-                self.on_ground = False
-                # 设置一个小的垂直速度，让玩家自然下落
-                if self.vertical_velocity == 0:
-                    self.vertical_velocity = 0.1
+            # 存储目标位置
+            if target_y != self.y:
+                self.target_y = target_y
         
         # 更新跳跃冷却
         if self.jump_cooldown > 0:
@@ -959,20 +890,270 @@ class ShangYang:
                     if part.visible and part.collides_with(obj):
                         return True
         return False
-
     def update_move(self, game_world=None):
-        """执行实际的移动操作"""
-        # 检查是否有目标位置需要更新
-        moved = False
+        """执行实际的移动操作 - 使用射线投射进行碰撞检测"""
+        if game_world is None:
+            return False
         
-
-        self.x = self.target_x
-        self.y = self.target_y
-        self.update_position(self.x, self.y)
-        moved = True
-            
-
+        moved = False
+        moved_x = False
+        moved_y = False
+        
+        # 初始化目标位置
+        target_x = self.target_x
+        target_y = self.target_y
+        
+        # 如果没有目标位置，使用当前位置
+        if target_x is None:
+            target_x = self.x
+        if target_y is None:
+            target_y = self.y
+        
+        # 计算移动向量
+        dx = target_x - self.x
+        dy = target_y - self.y
+        
+        # 如果两个方向都没有移动，直接返回
+        if dx == 0 and dy == 0:
+            return False
+        
+        # 处理水平移动
+        if dx != 0:
+            moved_x = self.move_horizontal(dx, game_world)
+        
+        # 处理垂直移动
+        if dy != 0:
+            moved_y = self.move_vertical(dy, game_world)
+        
+        moved = moved_x or moved_y
+        
+        # 重置目标位置
+        self.target_x = None
+        self.target_y = None
+        
         return moved
+    def move_horizontal(self, dx, game_world):
+        """处理水平移动"""
+        if dx == 0:
+            return False
+        
+        # 计算移动方向
+        direction = 1 if dx > 0 else -1
+        
+        # 从当前位置到目标位置，逐步检查
+        current_x = self.x
+        target_x = self.x + dx
+        
+        # 获取所有需要检查的碰撞点
+        collision_points = self.get_horizontal_collision_points(current_x, target_x, self.y, game_world)
+        
+        # 如果没有碰撞点，直接移动到目标位置
+        if not collision_points:
+            self.x = target_x
+            self.update_position(self.x, self.y)
+            return True
+        
+        # 找出最近的碰撞点
+        nearest_collision = None
+        min_distance = float('inf')
+        
+        for point in collision_points:
+            # 修正：point[0] 是碰撞x坐标，point[1] 是碰撞表面
+            collision_x, collision_surface = point
+            
+            # 计算到当前位置的距离
+            distance = abs(collision_x - current_x)
+            
+            # 确保碰撞点在移动方向上
+            if (direction > 0 and collision_x > current_x) or (direction < 0 and collision_x < current_x):
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_collision = point
+        
+        # 如果没有在移动方向上的碰撞点，直接移动到目标位置
+        if nearest_collision is None:
+            self.x = target_x
+            self.update_position(self.x, self.y)
+            return True
+        
+        # 根据碰撞表面的方向调整位置
+        collision_x, collision_surface = nearest_collision
+        
+        if collision_surface == "left":
+            # 从左侧碰撞，停在碰撞点左侧
+            # 向左移动一小段距离，确保不穿入障碍物
+            self.x = collision_x - 0.1
+        elif collision_surface == "right":
+            # 从右侧碰撞，停在碰撞点右侧
+            # 向右移动一小段距离，确保不穿入障碍物
+            self.x = collision_x + 0.1
+        
+        self.update_position(self.x, self.y)
+        return True
+
+    def move_vertical(self, dy, game_world):
+        """处理垂直移动"""
+        if dy == 0:
+            return False
+        
+        # 计算移动方向
+        direction = 1 if dy > 0 else -1
+        
+        # 从当前位置到目标位置，逐步检查
+        current_y = self.y
+        target_y = self.y + dy
+        
+        # 获取所有需要检查的碰撞点
+        collision_points = self.get_vertical_collision_points(current_y, target_y, self.x, game_world)
+        
+        # 如果没有碰撞点，直接移动到目标位置
+        if not collision_points:
+            self.y = target_y
+            self.update_position(self.x, self.y)
+            
+            # 检查是否落地
+            if dy > 0:  # 向下移动
+                self.on_ground = True
+                self.vertical_velocity = 0
+            return True
+        
+        # 找出最近的碰撞点
+        nearest_collision = None
+        min_distance = float('inf')
+        
+        for point in collision_points:
+            # 修正：point[0] 是碰撞y坐标，point[1] 是碰撞表面
+            collision_y, collision_surface = point
+            
+            # 计算到当前位置的距离
+            distance = abs(collision_y - current_y)
+            
+            # 确保碰撞点在移动方向上
+            if (direction > 0 and collision_y > current_y) or (direction < 0 and collision_y < current_y):
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_collision = point
+        
+        # 如果没有在移动方向上的碰撞点，直接移动到目标位置
+        if nearest_collision is None:
+            self.y = target_y
+            self.update_position(self.x, self.y)
+            
+            # 检查是否落地
+            if dy > 0:  # 向下移动
+                self.on_ground = True
+                self.vertical_velocity = 0
+            return True
+        
+        # 根据碰撞表面的方向调整位置
+        collision_y, collision_surface = nearest_collision
+        
+        if collision_surface == "top":
+            # 从上侧碰撞，停在碰撞点上侧
+            # 向上移动一小段距离，确保不穿入障碍物
+            self.y = collision_y - 0.1-1
+            self.on_ground = True
+    def get_horizontal_collision_points(self, start_x, end_x, y, game_world):
+        """获取水平方向上的所有碰撞点"""
+        collision_points = []
+        
+        # 计算步进方向
+        direction = 1 if end_x > start_x else -1
+        
+        # 检查每个身体部位的水平移动路径
+        for name, part in self.body_parts.items():
+            if not part.visible or self.parts_separated.get(name, False):
+                continue
+            
+            # 计算部位相对于玩家的偏移
+            offset_x = part.x - self.x
+            offset_y = part.y - self.y
+            
+            # 计算部位的起始和结束位置
+            part_start_x = start_x + offset_x
+            part_end_x = end_x + offset_x
+            part_y = y + offset_y
+            
+            # 检查从起始到结束的每个整数x坐标
+            start_grid_x = int(min(part_start_x, part_end_x))
+            end_grid_x = int(max(part_start_x, part_end_x)) + 1
+            
+            for grid_x in range(start_grid_x, end_grid_x + 1):
+                # 检查当前位置是否有碰撞
+                if 0 <= grid_x < game_world.width and 0 <= int(part_y) < game_world.height:
+                    if game_world.collision_grid[grid_x][int(part_y)] == 1:
+                        # 确定碰撞表面
+                        if direction > 0:  # 向右移动
+                            collision_surface = "left"
+                            # 碰撞面是障碍物的左侧边缘
+                            collision_x = grid_x
+                        else:  # 向左移动
+                            collision_surface = "right"
+                            # 碰撞面是障碍物的右侧边缘
+                            collision_x = grid_x + 1
+                        
+                        collision_points.append((collision_x, collision_surface))
+        
+        return collision_points
+
+    def get_vertical_collision_points(self, start_y, end_y, x, game_world):
+        """获取垂直方向上的所有碰撞点"""
+        collision_points = []
+        
+        # 计算步进方向
+        direction = 1 if end_y > start_y else -1
+        
+        # 检查每个身体部位的垂直移动路径
+        for name, part in self.body_parts.items():
+            if not part.visible or self.parts_separated.get(name, False):
+                continue
+            
+            # 计算部位相对于玩家的偏移
+            offset_x = part.x - self.x
+            offset_y = part.y - self.y
+            
+            # 计算部位的起始和结束位置
+            part_x = x + offset_x
+            part_start_y = start_y + offset_y
+            part_end_y = end_y + offset_y
+            
+            # 检查从起始到结束的每个整数y坐标
+            start_grid_y = int(min(part_start_y, part_end_y))
+            end_grid_y = int(max(part_start_y, part_end_y)) + 1
+            
+            for grid_y in range(start_grid_y, end_grid_y + 1):
+                # 检查当前位置是否有碰撞
+                if 0 <= int(part_x) < game_world.width and 0 <= grid_y < game_world.height:
+                    if game_world.collision_grid[int(part_x)][grid_y] == 1:
+                        # 确定碰撞表面
+                        if direction > 0:  # 向下移动
+                            collision_surface = "top"
+                            # 碰撞面是障碍物的上侧边缘
+                            collision_y = grid_y
+                        else:  # 向上移动
+                            collision_surface = "bottom"
+                            # 碰撞面是障碍物的下侧边缘
+                            collision_y = grid_y + 1
+                        
+                        collision_points.append((collision_y, collision_surface))
+        
+        return collision_points
+    def check_below_empty(self, game_world):
+        """检查玩家下方是否为空（使用新的碰撞检测）"""
+        # 检查每个身体部位下方
+        for name, part in self.body_parts.items():
+            if not part.visible or self.parts_separated.get(name, False):
+                continue
+            
+            # 计算部位下方的位置
+            part_x = int(part.x)
+            part_y = int(part.y) + 1
+            
+            if 0 <= part_x < game_world.width and 0 <= part_y < game_world.height:
+                if game_world.collision_grid[part_x][part_y] == 1:
+                    return False
+        
+        return True
     def update(self, game_world=None):
         """更新玩家状态"""
         # 更新冷却时间
@@ -986,12 +1167,12 @@ class ShangYang:
             self.r_cooldown -= 1
         if self.big_jump_timer>0:
             self.big_jump_timer -=1
-
-        self.update_move(game_world)
-        
         # 应用重力
         if game_world:
             self.apply_gravity(game_world)
+        self.update_move(game_world)
+        
+
             # 检查是否到达终点
         if game_world:
             self.check_endpoint_collision(game_world)
