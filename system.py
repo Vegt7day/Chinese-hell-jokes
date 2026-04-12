@@ -198,6 +198,65 @@ class GameWorld:
         self.height = height
         self.ground_level = self.height - 2
         self.scene_objects = []
+                # 初始化碰撞网格
+        self.collision_grid = [[0] * height for _ in range(width)]
+    def add_scene_object(self, scene_object):
+        """添加场景物体"""
+        self.scene_objects.append(scene_object)
+        
+        # 更新碰撞网格
+        if scene_object.collidable:
+            x, y = int(scene_object.x), int(scene_object.y)
+            if 0 <= x < self.width and 0 <= y < self.height:
+                self.collision_grid[x][y] = 1
+    
+    def remove_scene_object(self, scene_object):
+        """移除场景物体"""
+        if scene_object in self.scene_objects:
+            self.scene_objects.remove(scene_object)
+            
+            # 更新碰撞网格
+            if scene_object.collidable:
+                x, y = int(scene_object.x), int(scene_object.y)
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    self.collision_grid[x][y] = 0
+    
+    def update_collision_grid(self):
+        """更新碰撞网格"""
+        # 重置碰撞网格
+        self.collision_grid = [[0] * self.height for _ in range(self.width)]
+        
+        # 重新添加所有障碍物
+        for obj in self.scene_objects:
+            if obj.collidable:
+                x, y = int(obj.x), int(obj.y)
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    self.collision_grid[x][y] = 1
+    
+    def check_collision_at(self, x, y):
+        """检查指定坐标是否有碰撞"""
+        x_int, y_int = int(x), int(y)
+        if 0 <= x_int < self.width and 0 <= y_int < self.height:
+            return self.collision_grid[x_int][y_int] == 1
+        return False
+    
+    def check_rect_collision(self, rect):
+        """检查矩形区域是否有碰撞"""
+        # 将矩形转换为整数网格坐标范围
+        min_x = max(0, int(rect.left // GRID_SIZE))
+        max_x = min(self.width - 1, int(rect.right // GRID_SIZE))
+        min_y = max(0, int(rect.top // GRID_SIZE))
+        max_y = min(self.height - 1, int(rect.bottom // GRID_SIZE))
+        
+        for x in range(min_x, max_x + 1):
+            for y in range(min_y, max_y + 1):
+                if self.collision_grid[x][y] == 1:
+                    return True
+        return False
+    
+    def get_scene_objects(self):
+        """获取所有场景物体"""
+        return self.scene_objects
     # 在GameWorld类中创建关卡时
     def create_level_1(self):
         """创建第1关"""
@@ -324,7 +383,7 @@ class TankGame:
         """更新游戏状态"""
         if self.state not in [GAME_STATE_PLAYING]:
             return
-        
+        self.world.update_collision_grid()
         # 更新玩家
         self.player.update(self.world)
         if self.player.check_endpoint_collision(self.world):
