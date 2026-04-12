@@ -8,7 +8,7 @@ from __init__ import FPS,GAME_STATE_MENU,SCREEN_WIDTH, SCREEN_HEIGHT, GRID_SIZE,
 from player import ShangYang
 from enemy import Horse
 from bullet import Bullet
-from scene import Ground, Wall, Platform, Door, Trap  # 导入新的场景物体
+from scene import Ground, Wall, Platform, Door, Trap,Switch  # 导入新的场景物体
 from ui import UI
 class GameSystem:
     """游戏系统类"""
@@ -200,8 +200,26 @@ class GameWorld:
         self.scene_objects = []
         
         # 创建底部地面
+        self.create_level_1()
         self.create_ground()
-    
+    # 在GameWorld类中创建关卡时
+    def create_level_1(self):
+        """创建第1关"""
+        # 创建红色开关
+        red_switch = Switch(5, 8, 0)  # 红色开关
+        self.add_scene_object(red_switch)
+        
+        # 创建红色门
+        red_door = Door(3, 46, 0)  # 红色门
+        self.add_scene_object(red_door)
+        
+        # 创建绿色开关
+        green_switch = Switch(15, 8, 1)  # 绿色开关
+        self.add_scene_object(green_switch)
+        
+        # 创建绿色门
+        green_door = Door(3, 47, 1)  # 绿色门
+        self.add_scene_object(green_door)
     def create_ground(self):
         """创建底部地面"""
         for x in range(self.width):
@@ -316,6 +334,8 @@ class TankGame:
         if keys[pygame.K_SPACE]:
             self.player.attack(self.bullets, self.world)
         # 在TankGame的update方法中，修改子弹碰撞检测部分
+    # 在TankGame的update方法中，修改子弹碰撞检测部分
+    # 在TankGame的update方法中，修改子弹与开关的碰撞检测
     def update(self):
         """更新游戏状态"""
         if self.state not in [GAME_STATE_PLAYING]:
@@ -335,24 +355,24 @@ class TankGame:
                     enemy.on_ground = True
                     enemy.update_rect()
                     break
-            
-            # 检查敌人是否与玩家身体部位碰撞
-            player_hit = False
-            for part_name, part in self.player.body_parts.items():
-                if part.visible and enemy.collides_with(part):
-                    player_hit = True
-                    break
-            
-            if player_hit:
-                self.player.health -= 1
-                if self.player.health <= 0:
-                    self.state = GAME_STATE_GAME_OVER
-                    self.show_message("游戏结束！", 300)
-                else:
-                    enemy.x += random.choice([-2, 2])
-                    enemy.y += random.choice([-2, 2])
-                    enemy.update_rect()
-                    self.show_message("被马撞到了！", 30)
+                
+                # 检查敌人是否与玩家身体部位碰撞
+                player_hit = False
+                for part_name, part in self.player.body_parts.items():
+                    if part.visible and enemy.collides_with(part):
+                        player_hit = True
+                        break
+                
+                if player_hit:
+                    self.player.health -= 1
+                    if self.player.health <= 0:
+                        self.state = GAME_STATE_GAME_OVER
+                        self.show_message("游戏结束！", 300)
+                    else:
+                        enemy.x += random.choice([-2, 2])
+                        enemy.y += random.choice([-2, 2])
+                        enemy.update_rect()
+                        self.show_message("被马撞到了！", 30)
         
         # 更新子弹
         bullets_to_remove = []
@@ -364,8 +384,25 @@ class TankGame:
                 bullets_to_remove.append(bullet)
                 continue
             
-            # 只检查没有停止的子弹是否击中敌人
+            # 只检查没有停止的子弹
             if not bullet.is_stopped:
+                # 检查子弹是否击中开关
+                switch_hit = None
+                for obj in self.world.get_scene_objects():
+                    if isinstance(obj, Switch) and bullet.rect.colliderect(obj.rect):
+                        switch_hit = obj
+                        break
+                
+                if switch_hit:
+                    # 切换开关状态
+                    switch_hit.toggle(self.world)
+                    state_text = "开" if switch_hit.state == "on" else "关"
+                    self.show_message(f"开关变为{state_text}!", 30)
+                    # 击中开关后清除子弹
+                    bullets_to_remove.append(bullet)
+                    bullet.clear()
+                    continue
+                
                 # 检查子弹是否击中敌人
                 enemy_hit = None
                 for enemy in self.enemies:

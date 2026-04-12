@@ -28,6 +28,11 @@ DARK_GREEN = (0, 150, 0)
 BROWN = (150, 100, 50)
 DARK_YELLOW = (150, 150, 0)  # 隐藏部位的颜色
 
+# 新增颜色
+DARK_RED = (150, 0, 0)
+DARK_BLUE = (0, 0, 150)
+DARK_GRAY = (100, 100, 100)
+
 # 马的5种颜色
 HORSE_COLORS = [
     (255, 100, 100),    # 红色
