@@ -49,6 +49,8 @@ class ShangYang:
         # 主位置（以"商"为中心）
         self.x = x
         self.y = y
+        self.target_x = x
+        self.target_y = y
         self.fall_check_timer = 0
         self.fall_check_interval = 5  # 每5帧检查一次
         self.big_jump_timer=0
@@ -693,7 +695,7 @@ class ShangYang:
         return True
     
     def move(self, dx, dy, game_world):
-        """移动玩家 - 使用碰撞网格优化"""
+        """移动玩家 - 只计算目标位置，不实际移动"""
         if self.check_leg_auto_recover(game_world):
             self.recover_legs_only(game_world)
 
@@ -717,37 +719,8 @@ class ShangYang:
             
             # 应用边界限制
             new_x = max(min_x, min(new_x, max_x))
-        
-        # 处理垂直移动
-        if dy != 0:
-            # 使用碰撞网格查找最近的无碰撞位置
-            safe_y = self.find_vertical_collision_distance_grid(new_y, game_world, dy)
-            new_y = safe_y
-            
-            # 应用边界限制
-            new_y = max(min_y, min(new_y, max_y))
-            
-            # 检查是否落地
-            if dy > 0:  # 向下移动
-                collision = self.check_vertical_collision_grid(new_y, game_world, False)
-                if collision == "down":
-                    self.on_ground = True
-                    self.vertical_velocity = 0
-                    if self.has_legs_separated():
-                        self.airborne_movement_allowed = False
-            
-            elif dy < 0:  # 向上移动
-                collision = self.check_vertical_collision_grid(new_y, game_world, True)
-                if collision == "up":
-                    self.vertical_velocity = 0
-
-        # 更新位置
-        if new_x != self.x or new_y != self.y:
-            self.update_position(new_x, new_y)
-            return True
-        
+        self.target_x = new_x
         return False
-    
     def jump(self, game_world):
         """普通跳跃"""
         if not self.can_move() or not self.is_jumping and self.on_ground and self.jump_cooldown <= 0:
@@ -807,17 +780,12 @@ class ShangYang:
                         return True
                 
                 # 同时检查相邻位置，防止在格子边界处穿模
-                # 检查左侧
-                check_x = int(test_part_x) - 1
-                if 0 <= check_x < game_world.width and 0 <= part_y_int < game_world.height:
-                    if game_world.collision_grid[check_x][part_y_int] == 1:
-                        return True
-                
-                # 检查右侧
-                check_x = int(test_part_x) + 1
-                if 0 <= check_x < game_world.width and 0 <= part_y_int < game_world.height:
-                    if game_world.collision_grid[check_x][part_y_int] == 1:
-                        return True
+                # 检查当前位置
+                for check_x in [part_x_int, part_x_int - 1, part_x_int + 1]:
+                    for check_y in [part_y_int, part_y_int - 1, part_y_int + 1]:
+                        if 0 <= check_x < game_world.width and 0 <= check_y < game_world.height:
+                            if game_world.collision_grid[check_x][check_y] == 1:
+                                return True
         
         return False
     def find_vertical_collision_distance_grid(self, target_y, game_world, direction):
@@ -882,7 +850,7 @@ class ShangYang:
         
         return None
     def apply_gravity(self, game_world):
-        """应用重力 - 使用碰撞网格优化"""
+        """应用重力 - 只计算目标位置，不实际移动"""
         # 更新坠落检查计时器
         if self.fall_check_timer > 0:
             self.fall_check_timer -= 1
@@ -916,17 +884,7 @@ class ShangYang:
                 # 检查是否落地
                 if safe_y < target_y:
                     # 碰到下方障碍
-                    # 确保不穿入障碍物
                     final_y = safe_y
-                    
-                    # # 再次检查最终位置是否安全
-                    # if self.check_vertical_collision_grid(final_y, game_world, False) == "down":
-                    #     # 如果仍然碰撞，向上微调
-                    #     for adjust in range(1, 11):  # 最多调整1.0个单位
-                    #         test_y = final_y - adjust * 0.1
-                    #         if self.check_vertical_collision_grid(test_y, game_world, False) is None:
-                    #             final_y = test_y
-                    #             break
                     
                     self.on_ground = True
                     self.is_jumping = False
@@ -943,17 +901,7 @@ class ShangYang:
                 # 检查是否碰到头顶障碍
                 if safe_y > target_y:
                     # 碰到上方障碍
-                    # 确保不穿入障碍物
                     final_y = safe_y
-                    
-                    # # 再次检查最终位置是否安全
-                    # if self.check_vertical_collision_grid(final_y, game_world, True) == "up":
-                    #     # 如果仍然碰撞，向下微调
-                    #     for adjust in range(1, 11):  # 最多调整1.0个单位
-                    #         test_y = final_y + adjust * 0.1
-                    #         if self.check_vertical_collision_grid(test_y, game_world, True) is None:
-                    #             final_y = test_y
-                    #             break
                     
                     self.airborne_movement_allowed = False
                     self.vertical_velocity = 0
@@ -965,9 +913,11 @@ class ShangYang:
             else:
                 new_y = target_y
             
-            # 更新位置
+            # 存储目标位置，不立即更新实际位置
             if new_y != self.y:
-                self.update_position(self.x, new_y)
+                self.target_y = new_y
+                # 注意：重力只影响y轴，所以x轴保持原位置
+                # self.target_x = self.x
         
         # 新机制：当没有腿的时候，如果"鞅"字下方没有障碍物，就保持在原地
         if legs_separated:
@@ -1010,14 +960,19 @@ class ShangYang:
                         return True
         return False
 
+    def update_move(self, game_world=None):
+        """执行实际的移动操作"""
+        # 检查是否有目标位置需要更新
+        moved = False
+        
 
-    def update_direction(self, dx, dy):
-        """更新玩家方向"""
-        if dx > 0:
-            self.direction = "right"
-        elif dx < 0:
-            self.direction = "left"
-    
+        self.x = self.target_x
+        self.y = self.target_y
+        self.update_position(self.x, self.y)
+        moved = True
+            
+
+        return moved
     def update(self, game_world=None):
         """更新玩家状态"""
         # 更新冷却时间
@@ -1032,7 +987,8 @@ class ShangYang:
         if self.big_jump_timer>0:
             self.big_jump_timer -=1
 
-
+        self.update_move(game_world)
+        
         # 应用重力
         if game_world:
             self.apply_gravity(game_world)

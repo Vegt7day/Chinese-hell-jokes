@@ -368,11 +368,8 @@ class TankGame:
         #     dy -= 1
         # if keys[pygame.K_s]:  # 下
         #     dy += 1
-        
-        if dx != 0 or dy != 0:
-            if self.player.move(dx, dy, self.world):
-                self.player.update_direction(dx, dy)
-        
+        self.player.move(dx, dy, self.world)
+
         # 按住空格键连续发射
         if keys[pygame.K_SPACE]:
             self.player.attack(self.bullets, self.world)
