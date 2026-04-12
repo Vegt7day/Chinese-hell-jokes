@@ -10,6 +10,7 @@ from enemy import Horse
 from bullet import Bullet
 from scene import Ground, Wall, Platform, Door, Trap,Switch  # 导入新的场景物体
 from ui import UI
+from level_loader import LevelLoader  # 导入地图加载器
 class GameSystem:
     """游戏系统类"""
     def __init__(self):
@@ -198,10 +199,6 @@ class GameWorld:
         self.height = height
         self.ground_level = self.height - 2
         self.scene_objects = []
-        
-        # 创建底部地面
-        self.create_level_1()
-        self.create_ground()
     # 在GameWorld类中创建关卡时
     def create_level_1(self):
         """创建第1关"""
@@ -263,20 +260,11 @@ class TankGame:
     
     def reset_game(self):
         """重置游戏"""
-        # 创建游戏世界
-        self.world = GameWorld(SCREEN_WIDTH // GRID_SIZE, SCREEN_HEIGHT // GRID_SIZE)
-        
-        # 创建玩家
-        start_x = SCREEN_WIDTH // (2 * GRID_SIZE)
-        start_y = self.world.ground_level - 5  # 从地面上方5格开始
-        self.player = ShangYang(start_x, start_y)
+        # 从文件加载关卡
+        self.world, self.player, self.enemies = LevelLoader.load_level(self.level)
         
         # 设置地面高度
         self.player.set_ground_level(self.world.get_ground_level())
-        
-        # 创建敌人列表
-        self.enemies = []
-        self.spawn_enemies(5 + self.level * 2)  # 每关增加2个敌人
         
         # 子弹列表
         self.bullets = []
@@ -290,10 +278,8 @@ class TankGame:
         self.message = ""
         self.message_timer = 0
         
-    # ... 其他方法保持不变 ...
-    
     def spawn_enemies(self, count):
-        """生成敌人"""
+        """生成敌人（在需要时使用）"""
         for _ in range(count):
             # 在远离玩家的位置生成敌人
             while True:
@@ -304,7 +290,6 @@ class TankGame:
                 if abs(x - self.player.x) > 10 and abs(y - self.player.y) > 10:
                     self.enemies.append(Horse(x, y))
                     break
-    
     def show_message(self, message, duration=60):
         """显示消息"""
         self.message = message
