@@ -9,8 +9,8 @@ import sys
 pygame.init()
 
 # 游戏常量
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 1500
+SCREEN_HEIGHT = 1000
 GRID_SIZE = 20
 FPS = 60
 
