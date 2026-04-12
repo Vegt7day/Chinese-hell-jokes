@@ -500,7 +500,7 @@ class ShangYang:
         """检查是否应该自动回收腿"""
         if not self.has_legs_separated():
             return False
-        if self.big_jump_timer!=0:
+        if self.big_jump_timer > 0:
             return False
 
         # 计算腿的原始位置
@@ -721,6 +721,7 @@ class ShangYang:
     def can_move(self):
         """检查是否可以移动"""
         # 如果两条腿都分离，但在空中时可以移动
+        print("on_ground:", self.on_ground, "airborne_movement_allowed:", self.airborne_movement_allowed, "has_legs_separated:", self.has_legs_separated())
         if self.has_legs_separated():
             if not self.on_ground and self.airborne_movement_allowed:
                 return True
@@ -803,21 +804,23 @@ class ShangYang:
             return True
         return False
     
+
     def apply_gravity(self, game_world):
         """应用重力 - 改进版，下落时正好停在障碍上方"""
         # 更新坠落检查计时器
         if self.fall_check_timer > 0:
             self.fall_check_timer -= 1
         
+        # 检查腿是否分离
+        legs_separated = self.has_legs_separated()
+        
         # 如果玩家在地面上，检查是否需要开始下坠
-        if self.on_ground and self.fall_check_timer <= 0:
+        if self.on_ground and self.fall_check_timer and not legs_separated <= 0:
             if self.check_below_empty(game_world):
-                # 下方为空，开始下坠
+
                 self.on_ground = False
                 self.is_jumping = False
                 self.vertical_velocity = 0  # 初始速度为0
-            else :
-                self.on_ground=True
             self.fall_check_timer = self.fall_check_interval
         
         if not self.on_ground:
@@ -842,15 +845,7 @@ class ShangYang:
                     self.is_jumping = False
                     self.vertical_velocity = 0
                     new_y = safe_y
-                    
-                    # # 检查是否应该自动回收腿
-                    # if self.has_legs_separated():
-                    #     if self.check_leg_auto_recover(game_world):
-                    #         # 自动回收腿，只回收腿部
-                    #         self.recover_legs_only(game_world)
-                    #     else:
-                    #         # 落地后停止空中移动
-                    #         self.airborne_movement_allowed = False
+                    print("玩家落地了！")
                 else:
                     new_y = target_y
                     
@@ -875,6 +870,51 @@ class ShangYang:
             # 更新位置
             if new_y != self.y:
                 self.update_position(self.x, new_y)
+        
+        # 新机制：当没有腿的时候，如果"鞅"字下方没有障碍物，就保持在原地
+        if legs_separated :
+            # 检查鞅字下方是否有障碍物
+            yang_part = self.body_parts["yang"]
+            below_y = int(yang_part.y) + 1
+            
+            # 获取玩家整数坐标
+            player_center_x = int(self.x)
+            player_center_y = int(self.y)
+            
+            # 创建一个检测范围的矩形
+            check_rect = pygame.Rect(
+                (player_center_x) * GRID_SIZE,
+                (player_center_y + 1) * GRID_SIZE,  # 从玩家下方开始
+                GRID_SIZE,
+                GRID_SIZE
+            )
+            
+            has_below_obstacle = False
+            
+            # 遍历所有场景物体
+            for scene_obj in game_world.get_scene_objects():
+                if not scene_obj.collidable:
+                    continue
+                    
+                # 检查场景物体是否在鞅字下方
+                if check_rect.colliderect(scene_obj.rect):
+                    # 计算物体相对于鞅字的精确位置
+                    obj_below_player = scene_obj.y > yang_part.y
+                    obj_vertically_aligned = abs(scene_obj.x - yang_part.x) <= 0.5
+                    
+                    if obj_below_player and obj_vertically_aligned:
+                        # 在鞅字正下方有障碍物
+                        has_below_obstacle = True
+                        self.on_ground = True
+                        print  ("鞅字下方有障碍物，玩家在地面上")
+                        break
+            
+            if not has_below_obstacle:
+                # 鞅字下方没有障碍物，设置为在空中
+                self.on_ground = False
+                # 设置一个小的垂直速度，让玩家自然下落
+                if self.vertical_velocity == 0:
+                    self.vertical_velocity = 0.1
         
         # 更新跳跃冷却
         if self.jump_cooldown > 0:
