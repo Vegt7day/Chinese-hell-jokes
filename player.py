@@ -49,7 +49,8 @@ class ShangYang:
         # 主位置（以"商"为中心）
         self.x = x
         self.y = y
-        
+        self.fall_check_timer = 0
+        self.fall_check_interval = 5  # 每5帧检查一次
         # 游戏属性
         self.level = 1
         self.exp = 0
@@ -118,7 +119,70 @@ class ShangYang:
         # 移动状态
         self.is_airborne_without_legs = False
         self.airborne_movement_allowed = True
+    def check_below_empty(self, game_world):
+        """检查玩家下方是否为空（没有障碍物）"""
+        # 计算玩家核心的下方位置
+        below_y = int(self.y) + 1  # 向下取整后+1
         
+        # 检查以玩家为中心的一个范围
+        check_range_x = 1  # 横向检查范围
+        check_range_y = 1  # 纵向检查范围
+        
+        # 获取玩家整数坐标
+        player_center_x = int(self.x)
+        player_center_y = int(self.y)
+        
+        # 创建一个检测范围的矩形
+        # 检查从玩家中心向左右各check_range_x格，向下check_range_y格的范围
+        check_rect = pygame.Rect(
+            (player_center_x - check_range_x) * GRID_SIZE,
+            (player_center_y + 1) * GRID_SIZE,  # 从玩家下方开始
+            (check_range_x * 2 + 1) * GRID_SIZE,
+            check_range_y * GRID_SIZE
+        )
+        
+        # 遍历所有场景物体
+        for scene_obj in game_world.get_scene_objects():
+            if not scene_obj.collidable:
+                continue
+                
+            # 检查场景物体是否在检测范围内
+            if check_rect.colliderect(scene_obj.rect):
+                # 计算物体相对于玩家的精确位置
+                obj_below_player = scene_obj.y > self.y
+                obj_vertically_aligned = abs(scene_obj.x - self.x) <= 1.5
+                
+                if obj_below_player and obj_vertically_aligned:
+                    # 在玩家正下方有障碍物
+                    return False
+        
+        # 再检查所有可见的身体部位下方
+        for name, part in self.body_parts.items():
+            if not part.visible or self.parts_separated.get(name, False):
+                continue
+                
+            # 计算部位下方的位置（取整）
+            part_below_x = int(part.x)
+            part_below_y = int(part.y) + 1
+            
+            # 检查这个整数坐标位置是否有障碍
+            for scene_obj in game_world.get_scene_objects():
+                if not scene_obj.collidable:
+                    continue
+                    
+                # 检查障碍物是否在部位下方
+                obj_at_part_below = (int(scene_obj.x) == part_below_x and 
+                                    int(scene_obj.y) == part_below_y)
+                
+                # 或者障碍物在部位下方很近的位置
+                obj_near_part_below = (abs(scene_obj.x - part.x) < 1.0 and
+                                    scene_obj.y > part.y and
+                                    abs(scene_obj.y - (part.y + 1)) < 1.0)
+                
+                if obj_at_part_below or obj_near_part_below:
+                    return False
+        
+        return True
     def update_position(self, x, y):
         """更新玩家位置"""
         self.x = x
@@ -735,6 +799,19 @@ class ShangYang:
     
     def apply_gravity(self, game_world):
         """应用重力 - 改进版，下落时正好停在障碍上方"""
+        # 更新坠落检查计时器
+        if self.fall_check_timer > 0:
+            self.fall_check_timer -= 1
+        
+        # 如果玩家在地面上，检查是否需要开始下坠
+        if self.on_ground and self.fall_check_timer <= 0:
+            if self.check_below_empty(game_world):
+                # 下方为空，开始下坠
+                self.on_ground = False
+                self.is_jumping = False
+                self.vertical_velocity = 0  # 初始速度为0
+            self.fall_check_timer = self.fall_check_interval
+        
         if not self.on_ground:
             # 应用重力
             self.vertical_velocity += self.gravity
@@ -793,7 +870,6 @@ class ShangYang:
         # 更新跳跃冷却
         if self.jump_cooldown > 0:
             self.jump_cooldown -= 1
-    
     def update_direction(self, dx, dy):
         """更新玩家方向"""
         if dx > 0:
