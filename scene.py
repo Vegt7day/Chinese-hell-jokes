@@ -43,7 +43,7 @@ class Wall(SceneObject):
 class Platform(SceneObject):
     """平台"""
     def __init__(self, x, y):
-        super().__init__(x, y, "台", DARK_YELLOW, False)  # 可以从下方通过
+        super().__init__(x, y, "台", DARK_YELLOW, True)  # 可以从下方通过
 
 class EndPoint(SceneObject):
     """终点 - 到达后进入下一关"""

@@ -721,7 +721,7 @@ class ShangYang:
     def can_move(self):
         """检查是否可以移动"""
         # 如果两条腿都分离，但在空中时可以移动
-        print("on_ground:", self.on_ground, "airborne_movement_allowed:", self.airborne_movement_allowed, "has_legs_separated:", self.has_legs_separated())
+ 
         if self.has_legs_separated():
             if not self.on_ground and self.airborne_movement_allowed:
                 return True
@@ -845,7 +845,6 @@ class ShangYang:
                     self.is_jumping = False
                     self.vertical_velocity = 0
                     new_y = safe_y
-                    print("玩家落地了！")
                 else:
                     new_y = target_y
                     
@@ -906,7 +905,6 @@ class ShangYang:
                         # 在鞅字正下方有障碍物
                         has_below_obstacle = True
                         self.on_ground = True
-                        print  ("鞅字下方有障碍物，玩家在地面上")
                         break
             
             if not has_below_obstacle:

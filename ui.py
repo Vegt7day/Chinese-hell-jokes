@@ -45,7 +45,7 @@ class UI:
         
         # 绘制UI
         self.draw_game_ui(game_state)
-        
+        self.draw_keyboard_status(game_state)
         # 绘制消息
         if game_state["message"]:
             self.draw_message(game_state["message"])
@@ -173,6 +173,181 @@ class UI:
         message_rect = message_surface.get_rect(center=(SCREEN_WIDTH//2, 50))
         self.screen.blit(message_surface, message_rect)
     
+    def draw_keyboard_status(self, game_state):
+        """绘制键盘触发状态（类似游戏主播的键盘映射）"""
+        # 获取按键状态
+        keys = pygame.key.get_pressed()
+        
+        # 键盘布局配置
+        key_size = 40
+        key_spacing = 5
+        start_x = 20
+        start_y = SCREEN_HEIGHT - 300
+        
+        # 定义键盘布局
+        keyboard_layout = {
+            # 第一行：数字键
+            "1": {"label": "1", "key": pygame.K_1, "desc": "关卡1", "color": PURPLE},
+            "2": {"label": "2", "key": pygame.K_2, "desc": "关卡2", "color": PURPLE},
+            "3": {"label": "3", "key": pygame.K_3, "desc": "关卡3", "color": PURPLE},
+            "4": {"label": "4", "key": pygame.K_4, "desc": "关卡4", "color": PURPLE},
+            "5": {"label": "5", "key": pygame.K_5, "desc": "关卡5", "color": PURPLE},
+            
+            # 第二行：QWER
+            "Q": {"label": "Q", "key": pygame.K_q, "desc": "切换部位", "color": GREEN},
+            "W": {"label": "W", "key": pygame.K_w, "desc": "跳跃", "color": BLUE},
+            "E": {"label": "E", "key": pygame.K_e, "desc": "(备用)", "color": GRAY},
+            "R": {"label": "R", "key": pygame.K_r, "desc": "回收部位", "color": RED},
+            
+            # 第三行：ASDF
+            "A": {"label": "A", "key": pygame.K_a, "desc": "左移", "color": CYAN},
+            "S": {"label": "S", "key": pygame.K_s, "desc": "下蹲", "color": CYAN},
+            "D": {"label": "D", "key": pygame.K_d, "desc": "右移", "color": CYAN},
+            "F": {"label": "F", "key": pygame.K_f, "desc": "(备用)", "color": GRAY},
+            
+            # 第四行：ZXCV
+            "Z": {"label": "Z", "key": pygame.K_z, "desc": "(备用)", "color": GRAY},
+            "X": {"label": "X", "key": pygame.K_x, "desc": "(备用)", "color": GRAY},
+            "C": {"label": "C", "key": pygame.K_c, "desc": "(备用)", "color": GRAY},
+            "V": {"label": "V", "key": pygame.K_v, "desc": "(备用)", "color": GRAY},
+            
+            # 第五行：空格和特殊键
+            "J": {"label": "J", "key": pygame.K_j, "desc": "发射/动作", "color": YELLOW, "x_offset": 2},
+            "空格": {"label": "空格", "key": pygame.K_SPACE, "desc": "普通攻击", "color": YELLOW, "width": 120, "x_offset": 1},
+            "ESC": {"label": "ESC", "key": pygame.K_ESCAPE, "desc": "菜单", "color": RED, "x_offset": 3}
+        }
+        
+        # 绘制标题
+        keyboard_title = self.small_font.render("键盘状态:", True, PURPLE)
+        self.screen.blit(keyboard_title, (start_x, start_y - 30))
+        
+        # 绘制键盘按键
+        row_height = key_size + 20
+        col_width = key_size + key_spacing
+        
+        # 第一行：数字键
+        for i, key in enumerate(["1", "2", "3", "4", "5"]):
+            key_info = keyboard_layout[key]
+            is_pressed = keys[key_info["key"]]
+            self._draw_key_button(
+                start_x + i * col_width, 
+                start_y, 
+                key_info, 
+                is_pressed
+            )
+        
+        # 第二行：QWER
+        for i, key in enumerate(["Q", "W", "E", "R"]):
+            key_info = keyboard_layout[key]
+            is_pressed = keys[key_info["key"]]
+            self._draw_key_button(
+                start_x + i * col_width, 
+                start_y + row_height, 
+                key_info, 
+                is_pressed
+            )
+        
+        # 第三行：ASDF
+        for i, key in enumerate(["A", "S", "D", "F"]):
+            key_info = keyboard_layout[key]
+            is_pressed = keys[key_info["key"]]
+            self._draw_key_button(
+                start_x + i * col_width, 
+                start_y + row_height * 2, 
+                key_info, 
+                is_pressed
+            )
+        
+        # 第四行：ZXCV
+        for i, key in enumerate(["Z", "X", "C", "V"]):
+            key_info = keyboard_layout[key]
+            is_pressed = keys[key_info["key"]]
+            self._draw_key_button(
+                start_x + i * col_width, 
+                start_y + row_height * 3, 
+                key_info, 
+                is_pressed
+            )
+        
+        # 第五行：特殊键
+        # J键
+        j_info = keyboard_layout["J"]
+        is_j_pressed = keys[j_info["key"]]
+        self._draw_key_button(
+            start_x, 
+            start_y + row_height * 4, 
+            j_info, 
+            is_j_pressed
+        )
+        
+        # 空格键
+        space_info = keyboard_layout["空格"]
+        is_space_pressed = keys[space_info["key"]]
+        self._draw_key_button(
+            start_x + col_width, 
+            start_y + row_height * 4, 
+            space_info, 
+            is_space_pressed
+        )
+        
+        # ESC键
+        esc_info = keyboard_layout["ESC"]
+        is_esc_pressed = keys[esc_info["key"]]
+        self._draw_key_button(
+            start_x + col_width + space_info.get("width", key_size) + key_spacing, 
+            start_y + row_height * 4, 
+            esc_info, 
+            is_esc_pressed
+        )
+        
+        # 绘制状态说明
+        status_y = start_y + row_height * 5 + 10
+        status_font = pygame.font.SysFont("simhei", 16)
+        
+        # 玩家当前选中的部位
+        selected_part = game_state.get("player_selected_part", "手")
+        selected_text = status_font.render(f"当前部位: {selected_part}", True, GREEN)
+        self.screen.blit(selected_text, (start_x, status_y))
+        
+        # 分离的部位
+        separated_parts = game_state.get("player_separated_parts", [])
+        if separated_parts:
+            separated_text = status_font.render(f"分离: {', '.join(separated_parts)}", True, YELLOW)
+            self.screen.blit(separated_text, (start_x + 120, status_y))
+        else:
+            separated_text = status_font.render("分离: 无", True, GRAY)
+            self.screen.blit(separated_text, (start_x + 120, status_y))
+
+    def _draw_key_button(self, x, y, key_info, is_pressed):
+        """绘制单个按键按钮"""
+        # 按键大小
+        width = key_info.get("width", 40)
+        height = 40
+        
+        # 按键颜色
+        normal_color = (50, 50, 50)  # 灰色
+        pressed_color = key_info["color"]  # 按键对应的颜色
+        
+        # 绘制按键背景
+        color = pressed_color if is_pressed else normal_color
+        pygame.draw.rect(self.screen, color, (x, y, width, height), border_radius=5)
+        
+        # 绘制按键边框
+        border_color = WHITE if is_pressed else (100, 100, 100)
+        pygame.draw.rect(self.screen, border_color, (x, y, width, height), 2, border_radius=5)
+        
+        # 绘制按键标签
+        key_font = pygame.font.SysFont("simhei", 16, bold=True)
+        key_text = key_font.render(key_info["label"], True, WHITE)
+        key_rect = key_text.get_rect(center=(x + width//2, y + height//2 - 8))
+        self.screen.blit(key_text, key_rect)
+        
+        # 绘制按键功能描述
+        desc_font = pygame.font.SysFont("simhei", 10)
+        desc_text = desc_font.render(key_info["desc"], True, WHITE)
+        desc_rect = desc_text.get_rect(center=(x + width//2, y + height//2 + 8))
+        self.screen.blit(desc_text, desc_rect)
+
     def draw_menu(self, current_level, max_level):
         """绘制主菜单"""
         # 绘制背景

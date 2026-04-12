@@ -344,7 +344,7 @@ class TankGame:
             
             # 检查敌人是否与场景物体碰撞
             for obj in self.world.get_scene_objects():
-                if isinstance(obj, Ground) and enemy.collides_with(obj):
+                if (isinstance(obj, Ground)or isinstance(obj,Wall) )and enemy.collides_with(obj):
                     enemy.y = obj.y - 1
                     enemy.on_ground = True
                     enemy.update_rect()
@@ -439,6 +439,12 @@ class TankGame:
     
     def get_game_state(self):
         """获取游戏状态"""
+        # 获取玩家当前选中的部位
+        selected_part = self.player.get_selected_part_info()
+        
+        # 获取玩家分离的部位
+        separated_parts = self.player.get_separated_parts_info()
+        
         return {
             "state": self.state,
             "score": self.score,
@@ -450,7 +456,9 @@ class TankGame:
             "player_max_health": self.player.max_health,
             "enemies_killed": self.enemies_killed,
             "message": self.message,
-            "player_available_parts": self.get_available_parts()
+            "player_available_parts": self.get_available_parts(),
+            "player_selected_part": selected_part,  # 新增
+            "player_separated_parts": separated_parts  # 新增
         }
     
     def get_available_parts(self):
