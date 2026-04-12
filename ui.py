@@ -53,7 +53,7 @@ class UI:
     def draw_game_ui(self, game_state):
         """绘制游戏UI"""
         # 绘制标题
-        title = self.title_font.render("文字版坦克大战 - 商鞅 vs 马", True, CYAN)
+        title = self.title_font.render("文字地狱游戏 - 商鞅 ", True, CYAN)
         self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 10))
         
         # 绘制玩家状态
@@ -135,20 +135,10 @@ class UI:
         target_title = self.font.render("游戏目标:", True, PURPLE)
         self.screen.blit(target_title, (SCREEN_WIDTH - 200, target_y))
         
-        target_text = self.small_font.render(f"击败{20 + game_state['level'] * 5}匹马", True, WHITE)
+        target_text = self.small_font.render(f"过关", True, WHITE)
         self.screen.blit(target_text, (SCREEN_WIDTH - 200, target_y + 30))
         
-        # 绘制速度说明
-        speed_y = SCREEN_HEIGHT - 300
-        speed_title = self.font.render("速度设定:", True, PURPLE)
-        self.screen.blit(speed_title, (SCREEN_WIDTH - 200, speed_y))
-        
-        speed_text1 = self.small_font.render("玩家: 2倍敌人速度", True, GREEN)
-        self.screen.blit(speed_text1, (SCREEN_WIDTH - 200, speed_y + 30))
-        
-        speed_text2 = self.small_font.render("子弹: 5倍敌人速度", True, BLUE)
-        self.screen.blit(speed_text2, (SCREEN_WIDTH - 200, speed_y + 55))
-        
+
         # 绘制生命条
         bar_width = 200
         bar_height = 20
@@ -189,7 +179,7 @@ class UI:
         self.screen.fill(BLACK)
         
         # 绘制标题
-        title = self.big_font.render("文字版坦克大战", True, CYAN)
+        title = self.big_font.render("文字地狱大战", True, CYAN)
         self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 100))
         
         subtitle = self.title_font.render("商鞅 vs 马", True, YELLOW)
@@ -243,5 +233,5 @@ class UI:
         self.screen.blit(level_text, (SCREEN_WIDTH//2 - level_text.get_width()//2, SCREEN_HEIGHT//2 + 50))
         
         # 绘制重新开始提示
-        restart_text = self.font.render("按 R 键重新开始游戏，按 ESC 返回主菜单", True, CYAN)
+        restart_text = self.font.render("按 ESC 返回主菜单", True, CYAN)
         self.screen.blit(restart_text, (SCREEN_WIDTH//2 - restart_text.get_width()//2, SCREEN_HEIGHT//2 + 150))

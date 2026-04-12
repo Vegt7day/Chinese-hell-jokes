@@ -51,6 +51,7 @@ class ShangYang:
         self.y = y
         self.fall_check_timer = 0
         self.fall_check_interval = 5  # 每5帧检查一次
+        self.big_jump_timer=0
         # 游戏属性
         self.level = 1
         self.exp = 0
@@ -381,7 +382,7 @@ class ShangYang:
         elif self.attack_mode == "super_jump":
             # 强力跳跃
             action_performed = self.super_jump(game_world)
-        
+            self.big_jump_timer=20
         if action_performed:
             self.j_cooldown = 15  # 动作冷却时间
 
@@ -499,7 +500,9 @@ class ShangYang:
         """检查是否应该自动回收腿"""
         if not self.has_legs_separated():
             return False
-        
+        if self.big_jump_timer!=0:
+            return False
+
         # 计算腿的原始位置
         left_leg_x, left_leg_y = self.left_leg_original_pos
         right_leg_x, right_leg_y = self.right_leg_original_pos
@@ -509,18 +512,18 @@ class ShangYang:
         player_y = self.y
         
         # 检查是否落在左腿位置
-        if (abs(player_x - left_leg_x) <= 1 and 
-            abs(player_y - left_leg_y) <= 1):
+        if (abs(player_x - left_leg_x) <= 2 and 
+            abs(player_y - left_leg_y) <= 2):
             return True
         
         # 检查是否落在右腿位置
-        if (abs(player_x - right_leg_x) <= 1 and 
-            abs(player_y - right_leg_y) <= 1):
+        if (abs(player_x - right_leg_x) <= 2 and 
+            abs(player_y - right_leg_y) <= 2):
             return True
         
         # 检查是否落在两腿中间位置
-        if (abs(player_x - (left_leg_x + right_leg_x) / 2) <= 1 and
-            abs(player_y - (left_leg_y + right_leg_y) / 2) <= 1):
+        if (abs(player_x - (left_leg_x + right_leg_x) / 2) <= 2 and
+            abs(player_y - (left_leg_y + right_leg_y) / 2) <= 2):
             return True
         
         return False
@@ -727,6 +730,11 @@ class ShangYang:
     def move(self, dx, dy, game_world):
         """移动玩家 - 改进版，遇到障碍停在障碍旁边"""
         # 检查是否可以移动
+
+        if self.check_leg_auto_recover(game_world):
+        # 自动回收腿，只回收腿部
+            self.recover_legs_only(game_world)
+
         if not self.can_move():
             return False
             
@@ -767,14 +775,12 @@ class ShangYang:
                     if self.has_legs_separated():
                         self.airborne_movement_allowed = False
                         # 检查是否应该自动回收腿
-                        if self.check_leg_auto_recover(game_world):
-                            # 自动回收腿，只回收腿部
-                            self.recover_legs_only(game_world)
+            
             elif dy < 0:  # 向上移动
                 collision = self.check_vertical_collision(new_y, game_world, True)
                 if collision == "up":
                     self.vertical_velocity = 0
-        
+
         # 更新位置
         if new_x != self.x or new_y != self.y:
             self.update_position(new_x, new_y)
@@ -810,6 +816,8 @@ class ShangYang:
                 self.on_ground = False
                 self.is_jumping = False
                 self.vertical_velocity = 0  # 初始速度为0
+            else :
+                self.on_ground=True
             self.fall_check_timer = self.fall_check_interval
         
         if not self.on_ground:
@@ -835,14 +843,14 @@ class ShangYang:
                     self.vertical_velocity = 0
                     new_y = safe_y
                     
-                    # 检查是否应该自动回收腿
-                    if self.has_legs_separated():
-                        if self.check_leg_auto_recover(game_world):
-                            # 自动回收腿，只回收腿部
-                            self.recover_legs_only(game_world)
-                        else:
-                            # 落地后停止空中移动
-                            self.airborne_movement_allowed = False
+                    # # 检查是否应该自动回收腿
+                    # if self.has_legs_separated():
+                    #     if self.check_leg_auto_recover(game_world):
+                    #         # 自动回收腿，只回收腿部
+                    #         self.recover_legs_only(game_world)
+                    #     else:
+                    #         # 落地后停止空中移动
+                    #         self.airborne_movement_allowed = False
                 else:
                     new_y = target_y
                     
@@ -854,6 +862,7 @@ class ShangYang:
                 # 检查是否碰到头顶障碍
                 if safe_y > target_y:
                     # 碰到上方障碍
+                    self.airborne_movement_allowed = False
                     self.vertical_velocity = 0
                     self.is_jumping = False
                     new_y = safe_y
@@ -888,7 +897,10 @@ class ShangYang:
             self.j_cooldown -= 1
         if self.r_cooldown > 0:
             self.r_cooldown -= 1
-        
+        if self.big_jump_timer>0:
+            self.big_jump_timer -=1
+
+
         # 应用重力
         if game_world:
             self.apply_gravity(game_world)
