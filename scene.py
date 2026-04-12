@@ -45,6 +45,16 @@ class Platform(SceneObject):
     def __init__(self, x, y):
         super().__init__(x, y, "台", DARK_YELLOW, False)  # 可以从下方通过
 
+class EndPoint(SceneObject):
+    """终点 - 到达后进入下一关"""
+    def __init__(self, x, y):
+        super().__init__(x, y, "终", GREEN, False)  # 不可碰撞，可以直接穿过
+        self.color = GREEN
+    
+    def collides_with(self, other):
+        """重写碰撞检测，返回True表示触发事件"""
+        return self.rect.colliderect(other.rect)
+
 
 class Door(SceneObject):
     """门 - 会同步开关的状态"""

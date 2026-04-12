@@ -4,7 +4,7 @@
 
 import pygame
 import random
-from __init__ import FPS,GAME_STATE_MENU,SCREEN_WIDTH, SCREEN_HEIGHT, GRID_SIZE, BLACK, GAME_STATE_PLAYING, GAME_STATE_GAME_OVER, GAME_STATE_VICTORY
+from __init__ import FPS,MAX_LEVEL,GAME_STATE_MENU,SCREEN_WIDTH, SCREEN_HEIGHT, GRID_SIZE, BLACK, GAME_STATE_PLAYING, GAME_STATE_GAME_OVER, GAME_STATE_VICTORY
 from player import ShangYang
 from enemy import Horse
 from bullet import Bullet
@@ -87,7 +87,6 @@ class GameSystem:
                 # 进入下一关
                 self.current_level += 1
                 self.start_game()
-        
         elif self.state == GAME_STATE_PLAYING:
             # 游戏进行中状态
             if event.key == pygame.K_ESCAPE:
@@ -328,7 +327,17 @@ class TankGame:
         
         # 更新玩家
         self.player.update(self.world)
-        
+        if self.player.check_endpoint_collision(self.world):
+            print(self.level)
+            if self.level < MAX_LEVEL:  # 假设最大5关
+                self.state = GAME_STATE_VICTORY
+                self.show_message(f"恭喜通过第{self.level}关！按N进入下一关，按ESC返回菜单", 300)
+            else:
+                self.state = GAME_STATE_VICTORY
+                self.show_message("恭喜通关！游戏胜利！", 300)
+            return
+
+
         # 更新敌人
         for enemy in self.enemies:
             enemy.update(self.world)

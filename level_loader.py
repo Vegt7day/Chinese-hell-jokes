@@ -4,7 +4,7 @@
 
 import os
 from __init__ import SCREEN_WIDTH,SCREEN_HEIGHT,GRID_SIZE
-from scene import Ground, Wall, Platform, Door, Trap, Switch
+from scene import Ground, Wall, Platform, Door, Trap, Switch,EndPoint
 from player import ShangYang
 from enemy import Horse
 import random
@@ -61,32 +61,36 @@ class LevelLoader:
                 obj_type = parts[0]
                 x, y = map(int, parts[1:3])
                 
-                if obj_type == "ground":
+                if obj_type == "地":
                     world.add_scene_object(Ground(x, y))
                 
-                elif obj_type == "wall":
+                elif obj_type == "墙":
                     world.add_scene_object(Wall(x, y))
                 
-                elif obj_type == "platform":
+                elif obj_type == "台":
                     world.add_scene_object(Platform(x, y))
                 
-                elif obj_type == "trap":
+                elif obj_type == "火":
                     world.add_scene_object(Trap(x, y))
                 
-                elif obj_type == "door":
+                elif obj_type == "门":
                     color_code = int(parts[3]) if len(parts) > 3 else 0
                     initial_state = parts[4] if len(parts) > 4 else "on"
                     world.add_scene_object(Door(x, y, color_code, initial_state))
                 
-                elif obj_type == "switch":
+                elif obj_type == "开":
                     color_code = int(parts[3]) if len(parts) > 3 else 0
                     initial_state = parts[4] if len(parts) > 4 else "on"
                     world.add_scene_object(Switch(x, y, color_code, initial_state))
                 
-                elif obj_type == "horse":
+                elif obj_type == "马":
                     # 敌人
                     enemies.append(Horse(x, y))
-                
+                elif obj_type == "终":
+                    # 创建终点
+                    end_point = EndPoint(x, y)
+                    world.add_scene_object(end_point)
+
                 elif obj_type == "ground_line":
                     # 地面线：从x1到x2的地面
                     x2 = int(parts[2])

@@ -206,32 +206,50 @@ class UI:
         info_text = self.small_font.render(f"共有{max_level}个关卡，每关敌人数量和难度递增", True, GRAY)
         self.screen.blit(info_text, (SCREEN_WIDTH//2 - info_text.get_width()//2, info_y))
     
-    def draw_game_over(self, score, level, victory=False):
+    def draw_game_over(self, score, level, is_victory=False):
         """绘制游戏结束画面"""
-        # 绘制半透明覆盖层
+        # 创建半透明背景
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 200))
+        overlay.fill((0, 0, 0, 180))
         self.screen.blit(overlay, (0, 0))
         
-        # 绘制游戏结束文本
-        if victory:
-            text = "恭喜胜利！"
-            color = GREEN
+        # 选择标题
+        if is_victory:
+            title = "恭喜通关！"
+            title_color = GREEN
         else:
-            text = "游戏结束！"
-            color = RED
+            title = "游戏结束"
+            title_color = RED
         
-        game_over_text = self.big_font.render(text, True, color)
-        self.screen.blit(game_over_text, (SCREEN_WIDTH//2 - game_over_text.get_width()//2, SCREEN_HEIGHT//2 - 100))
+        # 绘制标题
+        title_font = pygame.font.SysFont("simhei", 48)
+        title_surface = title_font.render(title, True, title_color)
+        title_rect = title_surface.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//3))
+        self.screen.blit(title_surface, title_rect)
         
         # 绘制分数
-        score_text = self.title_font.render(f"最终分数: {score}", True, YELLOW)
-        self.screen.blit(score_text, (SCREEN_WIDTH//2 - score_text.get_width()//2, SCREEN_HEIGHT//2))
+        score_font = pygame.font.SysFont("simhei", 36)
+        score_surface = score_font.render(f"分数: {score}", True, YELLOW)
+        score_rect = score_surface.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30))
+        self.screen.blit(score_surface, score_rect)
         
         # 绘制关卡
-        level_text = self.title_font.render(f"关卡: {level}", True, PURPLE)
-        self.screen.blit(level_text, (SCREEN_WIDTH//2 - level_text.get_width()//2, SCREEN_HEIGHT//2 + 50))
+        level_surface = score_font.render(f"关卡: {level}", True, YELLOW)
+        level_rect = level_surface.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 10))
+        self.screen.blit(level_surface, level_rect)
         
-        # 绘制重新开始提示
-        restart_text = self.font.render("按 ESC 返回主菜单", True, CYAN)
-        self.screen.blit(restart_text, (SCREEN_WIDTH//2 - restart_text.get_width()//2, SCREEN_HEIGHT//2 + 150))
+        # 绘制操作提示
+        hint_font = pygame.font.SysFont("simhei", 24)
+        
+        if is_victory and level < 5:  # 不是最后一关
+            hint1 = hint_font.render("按 R 重新开始当前关卡", True, WHITE)
+            hint2 = hint_font.render("按 N 进入下一关", True, WHITE)
+        else:
+            hint1 = hint_font.render("按 R 重新开始游戏", True, WHITE)
+            hint2 = hint_font.render("按 ESC 返回主菜单", True, WHITE)
+        
+        hint1_rect = hint1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 60))
+        hint2_rect = hint2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 90))
+        
+        self.screen.blit(hint1, hint1_rect)
+        self.screen.blit(hint2, hint2_rect)

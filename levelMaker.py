@@ -45,8 +45,8 @@ class MapGenerator:
     
     def __init__(self):
         # 屏幕设置
-        self.screen_width = 1200
-        self.screen_height = 800
+        self.screen_width = 1800
+        self.screen_height = 1000
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("地图生成器 - 商鞅 vs 马")
         
@@ -61,14 +61,16 @@ class MapGenerator:
         
         # 可用项目
         self.items = [
-            {"name": "player", "label": "玩家", "color": BLUE, "fixed_color": True},
-            {"name": "ground", "label": "地面", "color": (139, 69, 19), "fixed_color": True},  # 棕色
-            {"name": "wall", "label": "墙壁", "color": DARK_GREEN, "fixed_color": True},
-            {"name": "platform", "label": "平台", "color": ORANGE, "fixed_color": True},
-            {"name": "trap", "label": "陷阱", "color": RED, "fixed_color": True},
-            {"name": "door", "label": "门", "color": RED, "fixed_color": False},
-            {"name": "switch", "label": "开关", "color": RED, "fixed_color": False},
-            {"name": "horse", "label": "马(敌人)", "color": MAGENTA, "fixed_color": True},
+            {"name": "主", "label": "主", "color": BLUE, "fixed_color": True},
+            {"name": "地", "label": "地", "color": (139, 69, 19), "fixed_color": True},  # 棕色
+            {"name": "墙", "label": "墙", "color": DARK_GREEN, "fixed_color": True},
+            {"name": "台", "label": "台", "color": ORANGE, "fixed_color": True},
+            {"name": "火", "label": "火", "color": RED, "fixed_color": True},
+            {"name": "门", "label": "门", "color": RED, "fixed_color": False},
+            {"name": "开", "label": "开关", "color": RED, "fixed_color": False},
+            {"name": "马", "label": "马(敌人)", "color": MAGENTA, "fixed_color": True},
+            {"name": "终", "label": "终", "color": GREEN, "fixed_color": True},  # 添加终点
+        
         ]
         
         # 门和开关的颜色选项
@@ -187,7 +189,7 @@ class MapGenerator:
         item_name = self.get_selected_item()["name"]
         
         # 如果是玩家，确保只有一个
-        if item_name == "player":
+        if item_name == "主":
             # 清除旧的玩家位置
             if self.player_position:
                 old_x, old_y = self.player_position
@@ -196,11 +198,11 @@ class MapGenerator:
             
             # 设置新的玩家位置
             self.player_position = (grid_x, grid_y)
-            self.map_data[grid_y][grid_x] = {"type": "player", "color_index": 0}
+            self.map_data[grid_y][grid_x] = {"type": "主", "color_index": 0}
             return True
         
         # 如果是门或开关，需要记录颜色
-        elif item_name in ["door", "switch"]:
+        elif item_name in ["门", "开"]:
             color_info = self.get_selected_color()
             self.map_data[grid_y][grid_x] = {
                 "type": item_name,
@@ -430,27 +432,28 @@ class MapGenerator:
                         if cell:
                             item_type = cell["type"]
                             
-                            if item_type == "ground":
-                                f.write(f"ground {x} {y}\n")
-                            elif item_type == "wall":
-                                f.write(f"wall {x} {y}\n")
-                            elif item_type == "platform":
-                                f.write(f"platform {x} {y}\n")
-                            elif item_type == "trap":
-                                f.write(f"trap {x} {y}\n")
-                            elif item_type == "door":
+                            if item_type == "地":
+                                f.write(f"地 {x} {y}\n")
+                            elif item_type == "墙":
+                                f.write(f"墙 {x} {y}\n")
+                            elif item_type == "台":
+                                f.write(f"台 {x} {y}\n")
+                            elif item_type == "火":
+                                f.write(f"火 {x} {y}\n")
+                            elif item_type == "门":
                                 color_name = cell.get("color", "red")
                                 color_map = {"red": 0, "green": 1, "blue": 2, "yellow": 3, "purple": 4, "cyan": 5}
                                 color_code = color_map.get(color_name, 0)
-                                f.write(f"door {x} {y} {color_code}\n")
-                            elif item_type == "switch":
+                                f.write(f"门 {x} {y} {color_code}\n")
+                            elif item_type == "开":
                                 color_name = cell.get("color", "red")
                                 color_map = {"red": 0, "green": 1, "blue": 2, "yellow": 3, "purple": 4, "cyan": 5}
                                 color_code = color_map.get(color_name, 0)
-                                f.write(f"switch {x} {y} {color_code}\n")
-                            elif item_type == "horse":
-                                f.write(f"horse {x} {y}\n")
-                
+                                f.write(f"开 {x} {y} {color_code}\n")
+                            elif item_type == "马":
+                                f.write(f"马 {x} {y}\n")
+                            elif item_type == "终":
+                                f.write(f"终 {x} {y}\n")
                 print(f"地图已保存到: {filename}")
                 return True
                 
@@ -482,7 +485,7 @@ class MapGenerator:
                 
                 # 读取玩家位置
                 player_parts = lines[1].strip().split()
-                if player_parts[0] == "player":
+                if player_parts[0] == "主":
                     px, py = map(int, player_parts[1:])
                     self.player_position = (px, py)
                 
@@ -505,27 +508,28 @@ class MapGenerator:
                     if not self.is_valid_grid_pos(x, y):
                         continue
                     
-                    if item_type == "ground":
-                        self.map_data[y][x] = {"type": "ground", "color_index": 0}
-                    elif item_type == "wall":
-                        self.map_data[y][x] = {"type": "wall", "color_index": 0}
-                    elif item_type == "platform":
-                        self.map_data[y][x] = {"type": "platform", "color_index": 0}
-                    elif item_type == "trap":
-                        self.map_data[y][x] = {"type": "trap", "color_index": 0}
-                    elif item_type == "door":
+                    if item_type == "地":
+                        self.map_data[y][x] = {"type": "地", "color_index": 0}
+                    elif item_type == "墙":
+                        self.map_data[y][x] = {"type": "墙", "color_index": 0}
+                    elif item_type == "台":
+                        self.map_data[y][x] = {"type": "台", "color_index": 0}
+                    elif item_type == "火":
+                        self.map_data[y][x] = {"type": "火", "color_index": 0}
+                    elif item_type == "门":
                         color_code = int(parts[3]) if len(parts) > 3 else 0
                         color_names = ["red", "green", "blue", "yellow", "purple", "cyan"]
                         color_name = color_names[color_code] if color_code < len(color_names) else "red"
-                        self.map_data[y][x] = {"type": "door", "color": color_name, "color_index": color_code}
-                    elif item_type == "switch":
+                        self.map_data[y][x] = {"type": "门", "color": color_name, "color_index": color_code}
+                    elif item_type == "开":
                         color_code = int(parts[3]) if len(parts) > 3 else 0
                         color_names = ["red", "green", "blue", "yellow", "purple", "cyan"]
                         color_name = color_names[color_code] if color_code < len(color_names) else "red"
-                        self.map_data[y][x] = {"type": "switch", "color": color_name, "color_index": color_code}
-                    elif item_type == "horse":
-                        self.map_data[y][x] = {"type": "horse", "color_index": 0}
-                
+                        self.map_data[y][x] = {"type": "开", "color": color_name, "color_index": color_code}
+                    elif item_type == "马":
+                        self.map_data[y][x] = {"type": "马", "color_index": 0}
+                    elif item_type == "end":
+                        self.map_data[y][x] = {"type": "终", "color_index": 0}
                 print(f"地图已从 {latest_file} 加载")
                 return True
                 
@@ -572,22 +576,22 @@ class MapGenerator:
                     item_type = cell["type"]
                     
                     # 根据项目类型选择颜色
-                    if item_type == "player":
+                    if item_type == "主":
                         color = BLUE
                         label = "商"
-                    elif item_type == "ground":
+                    elif item_type == "地":
                         color = (139, 69, 19)  # 棕色
                         label = "地"
-                    elif item_type == "wall":
+                    elif item_type == "墙":
                         color = DARK_GREEN
                         label = "墙"
-                    elif item_type == "platform":
+                    elif item_type == "台":
                         color = ORANGE
                         label = "台"
-                    elif item_type == "trap":
+                    elif item_type == "火":
                         color = RED
-                        label = "陷"
-                    elif item_type == "door":
+                        label = "火"
+                    elif item_type == "门":
                         color_name = cell.get("color", "red")
                         color_map = {
                             "red": RED, "green": GREEN, "blue": BLUE,
@@ -595,7 +599,7 @@ class MapGenerator:
                         }
                         color = color_map.get(color_name, RED)
                         label = "门"
-                    elif item_type == "switch":
+                    elif item_type == "开":
                         color_name = cell.get("color", "red")
                         color_map = {
                             "red": RED, "green": GREEN, "blue": BLUE,
@@ -603,9 +607,12 @@ class MapGenerator:
                         }
                         color = color_map.get(color_name, RED)
                         label = "开"  # 默认显示"开"
-                    elif item_type == "horse":
+                    elif item_type == "马":
                         color = MAGENTA
                         label = "马"
+                    elif item_type == "终":
+                        color = GREEN
+                        label = "终"
                     else:
                         continue
                     

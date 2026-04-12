@@ -6,7 +6,7 @@ import pygame
 import random
 from __init__ import GRID_SIZE, YELLOW, GREEN, BLUE, RED, CYAN, WHITE
 from bullet import Bullet
-from scene import Ground, Wall, Platform, Door, Trap  # 导入场景物体
+from scene import Ground, Wall, Platform, Door, Trap,EndPoint  # 导入场景物体
 
 class GameObject:
     """基础游戏对象类"""
@@ -879,6 +879,17 @@ class ShangYang:
         # 更新跳跃冷却
         if self.jump_cooldown > 0:
             self.jump_cooldown -= 1
+    def check_endpoint_collision(self, game_world):
+        """检查是否到达终点"""
+        for obj in game_world.get_scene_objects():
+            if hasattr(obj, 'char') and obj.char == "终" and isinstance(obj, EndPoint):
+                # 检查玩家任意部位是否与终点碰撞
+                for part_name, part in self.body_parts.items():
+                    if part.visible and part.collides_with(obj):
+                        return True
+        return False
+
+
     def update_direction(self, dx, dy):
         """更新玩家方向"""
         if dx > 0:
@@ -904,7 +915,9 @@ class ShangYang:
         # 应用重力
         if game_world:
             self.apply_gravity(game_world)
-        
+            # 检查是否到达终点
+        if game_world:
+            self.check_endpoint_collision(game_world)
         # 更新身体部位可见性
         for part_name, is_active in self.active_bullets.items():
             if part_name == "hand_left":
