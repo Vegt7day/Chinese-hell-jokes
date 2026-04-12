@@ -23,7 +23,7 @@ class FontManager:
         """加载字体"""
         # 尝试加载多种中文字体
         font_paths = [
-            "fonts/simhei.ttf",           # 黑体
+            "fonts/simsum.ttf",           # 黑体
             "simhei.ttf",                 # 当前目录
             "C:/Windows/Fonts/simsun.ttc",  # Windows宋体
             "/System/Library/Fonts/PingFang.ttc",  # Mac字体
