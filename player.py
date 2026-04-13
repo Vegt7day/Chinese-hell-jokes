@@ -128,7 +128,7 @@ class ShangYang:
         self.airborne_movement_allowed = True
 
         # 调试开关
-        self.debug_recovery = True
+        self.debug_recovery = False
 
     def debug_print(self, *args):
         if self.debug_recovery:
@@ -1133,95 +1133,156 @@ class ShangYang:
             if part.visible and not self.parts_separated.get(name, False):
                 parts.append(name)
         return parts
+    def get_part_test_position(self, name, test_x, test_y):
+        """获取某个部位在玩家中心位于(test_x, test_y)时的位置"""
+        part = self.body_parts[name]
+        offset_x = part.x - self.x
+        offset_y = part.y - self.y
 
-    def check_step_collision(self, test_x, test_y, dx, dy, game_world):
-        """检查从当前位置到测试位置这一步是否会碰撞"""
-        if dy > 0:
-            check_parts = self.get_support_parts()
-        elif dy < 0:
-            check_parts = self.get_upward_collision_parts()
-        else:
-            check_parts = self.get_horizontal_collision_parts()
+        test_part_x = test_x + offset_x
+        test_part_y = test_y + offset_y
+
+        return test_part_x, test_part_y, offset_x, offset_y
+
+    def check_horizontal_step_collision(self, test_x, test_y, dx, game_world):
+        """检测左右方向碰撞：先左右，保留原有 +1 逻辑"""
+        if dx == 0:
+            return None
+
+        check_parts = self.get_horizontal_collision_parts()
 
         self.debug_print(
-            f"check_step_collision: test=({test_x:.2f},{test_y:.2f}) dx={dx} dy={dy} 检测部位={check_parts}"
+            f"check_horizontal_step_collision: test=({test_x:.2f},{test_y:.2f}) dx={dx} 检测部位={check_parts}"
         )
 
         for name in check_parts:
             part = self.body_parts[name]
 
             if not part.visible or self.parts_separated.get(name, False):
-                self.debug_print(f"check_step_collision: 跳过 {name}")
+                self.debug_print(f"check_horizontal_step_collision: 跳过 {name}")
                 continue
 
-            offset_x = part.x - self.x
-            offset_y = part.y - self.y
-            test_part_x = test_x + offset_x
-            test_part_y = test_y + offset_y
+            test_part_x, test_part_y, offset_x, offset_y = self.get_part_test_position(name, test_x, test_y)
 
             raw_x_int = int(test_part_x)
             raw_y_int = int(test_part_y)
 
-            x_bias = 0
-            y_bias = 0
-
-            # 水平移动时的接触面
-            if dx > 0:          # 向右
+            # 保留你原先左右检测的逻辑
+            if dx > 0:
                 x_bias = 1
-            elif dx < 0:        # 向左
-                x_bias = 0
-            
-            # 垂直移动时的接触面
-            if dy >0:          # 向下
-                y_bias = 1
-                
-                # 关键修正：
-                # 向上时，左右侧部位需要按自身所在侧修正x检测
-                if offset_x < 0:      # 左手 / 左脚
-                    x_bias = 0
-                elif offset_x > 0:    # 右手 / 右脚
-                    x_bias = 1
-                else:                 # 头 / 商 / 鞅
-                    x_bias = 0
-
-            elif dy < 0:        # 向上
-                y_bias = 0
-
-                # 关键修正：
-                # 向上时，左右侧部位需要按自身所在侧修正x检测
-                if offset_x < 0:      # 左手 / 左脚
-                    x_bias = 0
-                elif offset_x > 0:    # 右手 / 右脚
-                    x_bias = 1
-                else:                 # 头 / 商 / 鞅
-                    x_bias = 0
+                collision_side = "left"
             else:
-                y_bias = 1
+                x_bias = 0
+                collision_side = "right"
+
+            y_bias = 1
+
             part_x_int = int(test_part_x) + x_bias
             part_y_int = int(test_part_y) + y_bias
 
             self.debug_print(
-                f"check_step_collision: 部位={name} "
+                f"check_horizontal_step_collision: 部位={name} "
                 f"部位测试坐标=({test_part_x:.2f},{test_part_y:.2f}) "
                 f"raw格=({raw_x_int},{raw_y_int}) "
                 f"offset_x={offset_x:.2f} offset_y={offset_y:.2f} "
                 f"bias=({x_bias},{y_bias}) "
-                f"当前实际检测格=({part_x_int},{part_y_int})"
+                f"检测格=({part_x_int},{part_y_int})"
             )
 
             if 0 <= part_x_int < game_world.width and 0 <= part_y_int < game_world.height:
                 if game_world.collision_grid[part_x_int][part_y_int] == 1:
-                    self.debug_print(f"check_step_collision: 部位 {name} 撞上了格子 ({part_x_int},{part_y_int})")
-                    if dx > 0:
-                        return "left"
-                    elif dx < 0:
-                        return "right"
-                    elif dy > 0:
-                        return "top"
-                    elif dy < 0:
-                        return "bottom"
+                    self.debug_print(
+                        f"check_horizontal_step_collision: 部位 {name} 撞上格子 ({part_x_int},{part_y_int})"
+                    )
+                    return collision_side
             else:
-                self.debug_print(f"check_step_collision: 部位 {name} 检测越界 ({part_x_int},{part_y_int})")
+                self.debug_print(
+                    f"check_horizontal_step_collision: 部位 {name} 检测越界 ({part_x_int},{part_y_int})"
+                )
+
+        return None
+
+    def check_vertical_step_collision(self, test_x, test_y, dy, game_world):
+        """检测上下方向碰撞：先左右后上下中的‘上下’，保留原有 +1 逻辑"""
+        if dy == 0:
+            return None
+
+        if dy > 0:
+            check_parts = self.get_support_parts()
+        else:
+            check_parts = self.get_upward_collision_parts()
+
+        self.debug_print(
+            f"check_vertical_step_collision: test=({test_x:.2f},{test_y:.2f}) dy={dy} 检测部位={check_parts}"
+        )
+
+        for name in check_parts:
+            part = self.body_parts[name]
+
+            if not part.visible or self.parts_separated.get(name, False):
+                self.debug_print(f"check_vertical_step_collision: 跳过 {name}")
+                continue
+
+            test_part_x, test_part_y, offset_x, offset_y = self.get_part_test_position(name, test_x, test_y)
+
+            raw_x_int = int(test_part_x)
+            raw_y_int = int(test_part_y)
+
+            # 保留你原来的垂直检测逻辑
+            if dy > 0:
+                y_bias = 1
+                collision_side = "top"
+            else:
+                y_bias = 0
+                collision_side = "bottom"
+
+            if offset_x < 0:
+                x_bias = 0
+            elif offset_x > 0:
+                x_bias = 1
+            else:
+                x_bias = 0
+
+            part_x_int = int(test_part_x) + x_bias
+            part_y_int = int(test_part_y) + y_bias
+
+            self.debug_print(
+                f"check_vertical_step_collision: 部位={name} "
+                f"部位测试坐标=({test_part_x:.2f},{test_part_y:.2f}) "
+                f"raw格=({raw_x_int},{raw_y_int}) "
+                f"offset_x={offset_x:.2f} offset_y={offset_y:.2f} "
+                f"bias=({x_bias},{y_bias}) "
+                f"检测格=({part_x_int},{part_y_int})"
+            )
+
+            if 0 <= part_x_int < game_world.width and 0 <= part_y_int < game_world.height:
+                if game_world.collision_grid[part_x_int][part_y_int] == 1:
+                    self.debug_print(
+                        f"check_vertical_step_collision: 部位 {name} 撞上格子 ({part_x_int},{part_y_int})"
+                    )
+                    return collision_side
+            else:
+                self.debug_print(
+                    f"check_vertical_step_collision: 部位 {name} 检测越界 ({part_x_int},{part_y_int})"
+                )
+
+        return None
+
+    def check_step_collision(self, test_x, test_y, dx, dy, game_world):
+        """检查从当前位置到测试位置这一步是否会碰撞
+        先检测左右碰撞，再检测上下碰撞
+        """
+        self.debug_print(
+            f"check_step_collision: test=({test_x:.2f},{test_y:.2f}) dx={dx} dy={dy} -> 先水平后垂直"
+        )
+
+        horizontal_result = self.check_horizontal_step_collision(test_x, test_y, dx, game_world)
+        if horizontal_result is not None:
+            return horizontal_result
+
+        vertical_result = self.check_vertical_step_collision(test_x, test_y, dy, game_world)
+        if vertical_result is not None:
+            return vertical_result
 
         return None
 
