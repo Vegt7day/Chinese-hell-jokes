@@ -122,6 +122,31 @@ class ShangYang:
         # 移动状态
         self.is_airborne_without_legs = False
         self.airborne_movement_allowed = True
+
+    def check_trap_collision(self, game_world):
+        """检查玩家任意身体部位是否碰到陷阱(火)"""
+        for obj in game_world.get_scene_objects():
+            if not isinstance(obj, Trap):
+                continue
+
+            for part_name, part in self.body_parts.items():
+                if part.visible:
+                    if part.collides_with(obj):
+                        return True
+                    if int(part.x) == int(obj.x) and int(part.y) == int(obj.y):
+                        return True
+
+            if self.parts_separated["left_leg"] and self.left_leg_original_pos:
+                leg_x, leg_y = self.left_leg_original_pos
+                if int(leg_x) == int(obj.x) and int(leg_y) == int(obj.y):
+                    return True
+
+            if self.parts_separated["right_leg"] and self.right_leg_original_pos:
+                leg_x, leg_y = self.right_leg_original_pos
+                if int(leg_x) == int(obj.x) and int(leg_y) == int(obj.y):
+                    return True
+
+        return False
     def check_below_empty(self, game_world):
         """检查当前支撑部位下方是否为空"""
         support_parts = self.get_support_parts()

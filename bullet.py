@@ -49,34 +49,29 @@ class Bullet(GameObject):
     
     def update(self, game_world):
         """更新子弹位置"""
-
-        
-        # 根据方向移动
         if self.direction == "left":
             self.x -= self.speed / GRID_SIZE
         elif self.direction == "right":
             self.x += self.speed / GRID_SIZE
         elif self.direction == "up":
             self.y -= self.speed / GRID_SIZE
-        
+
         self.update_rect()
-        
+
         # 检查是否出界
-        if (self.x < 0 or self.x >= game_world.width or 
+        if (self.x < 0 or self.x >= game_world.width or
             self.y < 0 or self.y >= game_world.height):
-            # 子弹停止在边界
             self.stop()
             return True
-        
-        # 检查是否击中场景物体
+
+        # 检查是否击中场景物体（只看子弹碰撞）
         for obj in game_world.get_scene_objects():
-            if obj.collidable and self.rect.colliderect(obj.rect):
-                # 子弹停止在障碍前
+            if getattr(obj, "bullet_collidable", False) and self.rect.colliderect(obj.rect):
                 self.stop()
                 return True
-        
+
         return True
-    
+        
     def stop(self):
         """停止子弹"""
         self.is_stopped = True

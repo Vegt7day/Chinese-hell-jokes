@@ -70,7 +70,7 @@ class MapGenerator:
             {"name": "开", "label": "开关", "color": RED, "fixed_color": False},
             {"name": "马", "label": "马(敌人)", "color": MAGENTA, "fixed_color": True},
             {"name": "终", "label": "终", "color": GREEN, "fixed_color": True},  # 添加终点
-        
+            {"name": "洞", "label": "洞", "color": DARK_GRAY, "fixed_color": True},
         ]
         
         # 门和开关的颜色选项
@@ -407,32 +407,33 @@ class MapGenerator:
     def save_map(self):
         """保存地图到文件"""
         try:
-            # 查找可用的关卡编号
             level_num = 1
             while os.path.exists(os.path.join(self.save_path, f"level_{level_num}.txt")):
                 level_num += 1
-            
+
             filename = os.path.join(self.save_path, f"level_{level_num}.txt")
-            
+
             with open(filename, 'w', encoding='utf-8') as f:
                 # 写入地图尺寸
                 f.write(f"{self.grid_cols} {self.grid_rows}\n")
-                
+
                 # 写入玩家位置
                 if self.player_position:
                     px, py = self.player_position
-                    f.write(f"player {px} {py}\n")
+                    f.write(f"主 {px} {py}\n")
                 else:
-                    f.write(f"player {self.grid_cols//2} {self.grid_rows-5}\n")
-                
+                    f.write(f"主 {self.grid_cols//2} {self.grid_rows-5}\n")
+
                 # 写入所有物体
                 for y in range(self.grid_rows):
                     for x in range(self.grid_cols):
                         cell = self.map_data[y][x]
                         if cell:
                             item_type = cell["type"]
-                            
-                            if item_type == "地":
+
+                            if item_type == "主":
+                                continue
+                            elif item_type == "地":
                                 f.write(f"地 {x} {y}\n")
                             elif item_type == "墙":
                                 f.write(f"墙 {x} {y}\n")
@@ -440,74 +441,84 @@ class MapGenerator:
                                 f.write(f"台 {x} {y}\n")
                             elif item_type == "火":
                                 f.write(f"火 {x} {y}\n")
+                            elif item_type == "洞":
+                                f.write(f"洞 {x} {y}\n")
                             elif item_type == "门":
                                 color_name = cell.get("color", "red")
-                                color_map = {"red": 0, "green": 1, "blue": 2, "yellow": 3, "purple": 4, "cyan": 5}
+                                color_map = {
+                                    "red": 0, "green": 1, "blue": 2,
+                                    "yellow": 3, "purple": 4, "cyan": 5
+                                }
                                 color_code = color_map.get(color_name, 0)
                                 f.write(f"门 {x} {y} {color_code}\n")
                             elif item_type == "开":
                                 color_name = cell.get("color", "red")
-                                color_map = {"red": 0, "green": 1, "blue": 2, "yellow": 3, "purple": 4, "cyan": 5}
+                                color_map = {
+                                    "red": 0, "green": 1, "blue": 2,
+                                    "yellow": 3, "purple": 4, "cyan": 5
+                                }
                                 color_code = color_map.get(color_name, 0)
                                 f.write(f"开 {x} {y} {color_code}\n")
                             elif item_type == "马":
                                 f.write(f"马 {x} {y}\n")
                             elif item_type == "终":
                                 f.write(f"终 {x} {y}\n")
-                print(f"地图已保存到: {filename}")
-                return True
-                
+
+            print(f"地图已保存到: {filename}")
+            return True
+
         except Exception as e:
             print(f"保存地图时出错: {e}")
             return False
-    
     def load_map(self):
         """从文件加载地图"""
         try:
-            # 查找最新的关卡文件
             level_num = 1
             latest_file = None
-            
+
             while os.path.exists(os.path.join(self.save_path, f"level_{level_num}.txt")):
                 latest_file = os.path.join(self.save_path, f"level_{level_num}.txt")
                 level_num += 1
-            
+
             if not latest_file:
                 print("没有找到地图文件")
                 return False
-            
+
             with open(latest_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
-                
+
                 # 读取地图尺寸
                 width, height = map(int, lines[0].strip().split())
                 self.resize_map(width, height)
-                
-                # 读取玩家位置
-                player_parts = lines[1].strip().split()
-                if player_parts[0] == "主":
-                    px, py = map(int, player_parts[1:])
-                    self.player_position = (px, py)
-                
+
                 # 清空地图
                 self.map_data = [[None for _ in range(width)] for _ in range(height)]
-                
+                self.player_position = None
+
+                # 读取玩家位置
+                player_parts = lines[1].strip().split()
+                if player_parts[0] in ["主", "player"]:
+                    px, py = map(int, player_parts[1:3])
+                    self.player_position = (px, py)
+                    if self.is_valid_grid_pos(px, py):
+                        self.map_data[py][px] = {"type": "主", "color_index": 0}
+
                 # 读取物体
                 for line in lines[2:]:
                     line = line.strip()
-                    if not line:
+                    if not line or line.startswith("#"):
                         continue
-                    
+
                     parts = line.split()
                     if len(parts) < 3:
                         continue
-                    
+
                     item_type = parts[0]
                     x, y = map(int, parts[1:3])
-                    
+
                     if not self.is_valid_grid_pos(x, y):
                         continue
-                    
+
                     if item_type == "地":
                         self.map_data[y][x] = {"type": "地", "color_index": 0}
                     elif item_type == "墙":
@@ -516,6 +527,8 @@ class MapGenerator:
                         self.map_data[y][x] = {"type": "台", "color_index": 0}
                     elif item_type == "火":
                         self.map_data[y][x] = {"type": "火", "color_index": 0}
+                    elif item_type == "洞":
+                        self.map_data[y][x] = {"type": "洞", "color_index": 0}
                     elif item_type == "门":
                         color_code = int(parts[3]) if len(parts) > 3 else 0
                         color_names = ["red", "green", "blue", "yellow", "purple", "cyan"]
@@ -528,11 +541,12 @@ class MapGenerator:
                         self.map_data[y][x] = {"type": "开", "color": color_name, "color_index": color_code}
                     elif item_type == "马":
                         self.map_data[y][x] = {"type": "马", "color_index": 0}
-                    elif item_type == "end":
+                    elif item_type in ["终", "end"]:
                         self.map_data[y][x] = {"type": "终", "color_index": 0}
-                print(f"地图已从 {latest_file} 加载")
-                return True
-                
+
+            print(f"地图已从 {latest_file} 加载")
+            return True
+
         except Exception as e:
             print(f"加载地图时出错: {e}")
             return False
@@ -591,6 +605,9 @@ class MapGenerator:
                     elif item_type == "火":
                         color = RED
                         label = "火"
+                    elif item_type == "洞":
+                        color = DARK_GRAY
+                        label = "洞"
                     elif item_type == "门":
                         color_name = cell.get("color", "red")
                         color_map = {

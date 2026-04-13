@@ -4,11 +4,11 @@
 
 import pygame
 import random
-from __init__ import FPS,MAX_LEVEL,GAME_STATE_MENU,SCREEN_WIDTH, SCREEN_HEIGHT, GRID_SIZE, BLACK, GAME_STATE_PLAYING, GAME_STATE_GAME_OVER, GAME_STATE_VICTORY
+from __init__ import FPS,MAX_LEVEL,GAME_STATE_MENU,SCREEN_WIDTH, SCREEN_HEIGHT,GRID_SIZE, BLACK, GAME_STATE_PLAYING, GAME_STATE_GAME_OVER, GAME_STATE_VICTORY
 from player import ShangYang
 from enemy import Horse
 from bullet import Bullet
-from scene import Ground, Wall, Platform, Door, Trap,Switch  # 导入新的场景物体
+from scene import Ground, Wall, Platform, Door, Trap,Switch,Hole  # 导入新的场景物体
 from ui import UI
 from level_loader import LevelLoader  # 导入地图加载器
 class GameSystem:
@@ -198,117 +198,112 @@ class GameWorld:
         self.height = height
         self.ground_level = self.height - 2
         self.scene_objects = []
-                # 初始化碰撞网格
+
+        # 玩家碰撞图
         self.collision_grid = [[0] * height for _ in range(width)]
+        # 子弹碰撞图
+        self.bullet_collision_grid = [[0] * height for _ in range(width)]
+
     def add_scene_object(self, scene_object):
         """添加场景物体"""
         self.scene_objects.append(scene_object)
-        
-        # 更新碰撞网格
-        if scene_object.collidable:
-            x, y = int(scene_object.x), int(scene_object.y)
-            if 0 <= x < self.width and 0 <= y < self.height:
+
+        x, y = int(scene_object.x), int(scene_object.y)
+        if 0 <= x < self.width and 0 <= y < self.height:
+            if getattr(scene_object, "player_collidable", False):
                 self.collision_grid[x][y] = 1
-    
+            if getattr(scene_object, "bullet_collidable", False):
+                self.bullet_collision_grid[x][y] = 1
+
     def remove_scene_object(self, scene_object):
         """移除场景物体"""
         if scene_object in self.scene_objects:
             self.scene_objects.remove(scene_object)
-            
-            # 更新碰撞网格
-            if scene_object.collidable:
-                x, y = int(scene_object.x), int(scene_object.y)
-                if 0 <= x < self.width and 0 <= y < self.height:
-                    self.collision_grid[x][y] = 0
-    
+            self.update_collision_grid()
+
     def update_collision_grid(self):
         """更新碰撞网格"""
-        # 重置碰撞网格
         self.collision_grid = [[0] * self.height for _ in range(self.width)]
-        
-        # 重新添加所有障碍物
+        self.bullet_collision_grid = [[0] * self.height for _ in range(self.width)]
+
         for obj in self.scene_objects:
-            if obj.collidable:
-                x, y = int(obj.x), int(obj.y)
-                if 0 <= x < self.width and 0 <= y < self.height:
+            x, y = int(obj.x), int(obj.y)
+            if 0 <= x < self.width and 0 <= y < self.height:
+                if getattr(obj, "player_collidable", False):
                     self.collision_grid[x][y] = 1
-    
+                if getattr(obj, "bullet_collidable", False):
+                    self.bullet_collision_grid[x][y] = 1
+
     def check_collision_at(self, x, y):
-        """检查指定坐标是否有碰撞"""
+        """检查指定坐标是否有玩家碰撞"""
         x_int, y_int = int(x), int(y)
         if 0 <= x_int < self.width and 0 <= y_int < self.height:
             return self.collision_grid[x_int][y_int] == 1
         return False
-    
+
+    def check_bullet_collision_at(self, x, y):
+        """检查指定坐标是否有子弹碰撞"""
+        x_int, y_int = int(x), int(y)
+        if 0 <= x_int < self.width and 0 <= y_int < self.height:
+            return self.bullet_collision_grid[x_int][y_int] == 1
+        return False
+
     def check_rect_collision(self, rect):
-        """检查矩形区域是否有碰撞"""
-        # 将矩形转换为整数网格坐标范围
+        """检查矩形区域是否有玩家碰撞"""
         min_x = max(0, int(rect.left // GRID_SIZE))
         max_x = min(self.width - 1, int(rect.right // GRID_SIZE))
         min_y = max(0, int(rect.top // GRID_SIZE))
         max_y = min(self.height - 1, int(rect.bottom // GRID_SIZE))
-        
+
         for x in range(min_x, max_x + 1):
             for y in range(min_y, max_y + 1):
                 if self.collision_grid[x][y] == 1:
                     return True
         return False
-    
+
     def get_scene_objects(self):
         """获取所有场景物体"""
         return self.scene_objects
-    # 在GameWorld类中创建关卡时
-    def create_level_1(self):
-        """创建第1关"""
-        # 创建红色开关
-        red_switch = Switch(5, 8, 0)  # 红色开关
-        self.add_scene_object(red_switch)
-        
-        # 创建红色门
-        red_door = Door(3, 46, 0)  # 红色门
-        self.add_scene_object(red_door)
-        
-        # 创建绿色开关
-        green_switch = Switch(15, 8, 1)  # 绿色开关
-        self.add_scene_object(green_switch)
-        
-        # 创建绿色门
-        green_door = Door(3, 47, 1)  # 绿色门
-        self.add_scene_object(green_door)
+
+    def get_ground_level(self):
+        """获取地面高度"""
+        return self.ground_level
+
     def create_ground(self):
         """创建底部地面"""
         for x in range(self.width):
             ground = Ground(x, self.ground_level)
-            self.scene_objects.append(ground)
-    
-    def add_scene_object(self, scene_object):
-        """添加场景物体"""
-        self.scene_objects.append(scene_object)
-    
-    def remove_scene_object(self, scene_object):
-        """移除场景物体"""
-        if scene_object in self.scene_objects:
-            self.scene_objects.remove(scene_object)
-    
-    def get_scene_objects(self):
-        """获取所有场景物体"""
-        return self.scene_objects
-    
-    def get_ground_level(self):
-        """获取地面高度"""
-        return self.ground_level
-    
+            self.add_scene_object(ground)
+
+    def create_level_1(self):
+        """创建第1关"""
+        red_switch = Switch(5, 8, 0)
+        self.add_scene_object(red_switch)
+
+        red_door = Door(3, 46, 0)
+        self.add_scene_object(red_door)
+
+        green_switch = Switch(15, 8, 1)
+        self.add_scene_object(green_switch)
+
+        green_door = Door(3, 47, 1)
+        self.add_scene_object(green_door)
+
+        # 示例：加一个洞
+        hole = Hole(10, 20)
+        self.add_scene_object(hole)
+
     def draw(self, screen):
         """绘制游戏世界"""
-        # 绘制场景物体
         for obj in self.scene_objects:
             obj.draw(screen, pygame.font.SysFont("simhei", 20))
-        
-        # 绘制背景网格线
+
         for x in range(0, self.width * GRID_SIZE, GRID_SIZE):
             pygame.draw.line(screen, (30, 30, 30), (x, 0), (x, self.height * GRID_SIZE), 1)
         for y in range(0, self.height * GRID_SIZE, GRID_SIZE):
             pygame.draw.line(screen, (30, 30, 30), (0, y), (self.width * GRID_SIZE, y), 1)
+
+
 
 class TankGame:
     """游戏主类"""
@@ -375,8 +370,6 @@ class TankGame:
         if keys[pygame.K_SPACE]:
             self.player.attack(self.bullets, self.world)
         # 在TankGame的update方法中，修改子弹碰撞检测部分
-    # 在TankGame的update方法中，修改子弹碰撞检测部分
-    # 在TankGame的update方法中，修改子弹与开关的碰撞检测
     def update(self):
         """更新游戏状态"""
         if self.state not in [GAME_STATE_PLAYING]:
@@ -384,6 +377,14 @@ class TankGame:
         self.world.update_collision_grid()
         # 更新玩家
         self.player.update(self.world)
+
+        if self.player.check_trap_collision(self.world):
+            self.player.health = 0
+            self.state = GAME_STATE_GAME_OVER
+            self.show_message("你碰到了火！游戏结束！", 300)
+            return
+
+
         if self.player.check_endpoint_collision(self.world):
             print(self.level)
             if self.level < MAX_LEVEL:  # 假设最大5关
