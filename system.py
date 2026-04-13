@@ -368,6 +368,7 @@ class TankGame:
         #     dy -= 1
         # if keys[pygame.K_s]:  # 下
         #     dy += 1
+        print(f"玩家移动: dx={dx}, dy={dy}")
         self.player.move(dx, dy, self.world)
 
         # 按住空格键连续发射
