@@ -6,7 +6,8 @@ import pygame
 import random
 from __init__ import GRID_SIZE, YELLOW, GREEN, BLUE, RED, CYAN, WHITE
 from bullet import Bullet
-from scene import Ground, Wall, Platform, Door, Trap,EndPoint  # 导入场景物体
+from scene import Ground, Wall, Platform, Door, Trap, EndPoint  # 导入场景物体
+
 
 class GameObject:
     """基础游戏对象类"""
@@ -17,17 +18,18 @@ class GameObject:
         self.color = color
         self.visible = visible
         self.rect = pygame.Rect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE)
-    
+
     def update_rect(self):
         self.rect.x = self.x * GRID_SIZE
         self.rect.y = self.y * GRID_SIZE
+
     def draw(self, screen, font):
         if self.visible:
             text_surface = font.render(self.char, True, self.color)
-            text_rect = text_surface.get_rect(center=(self.x * GRID_SIZE + GRID_SIZE//2, 
-                                                      self.y * GRID_SIZE + GRID_SIZE//2))
+            text_rect = text_surface.get_rect(center=(self.x * GRID_SIZE + GRID_SIZE // 2,
+                                                      self.y * GRID_SIZE + GRID_SIZE // 2))
             screen.blit(text_surface, text_rect)
-    
+
     def collides_with(self, other):
         return self.rect.colliderect(other.rect)
 
@@ -37,15 +39,15 @@ class ShangYang:
     def __init__(self, x, y):
         # 玩家主体 - 竖排排列
         self.body_parts = {
-            "head": GameObject(x, y-2, "头", WHITE, True),
-            "shang": GameObject(x, y-1, "商", YELLOW, True),
-            "left_hand": GameObject(x-1, y-1, "手", WHITE, True),
-            "right_hand": GameObject(x+1, y-1, "手", WHITE, True),
+            "head": GameObject(x, y - 2, "头", WHITE, True),
+            "shang": GameObject(x, y - 1, "商", YELLOW, True),
+            "left_hand": GameObject(x - 1, y - 1, "手", WHITE, True),
+            "right_hand": GameObject(x + 1, y - 1, "手", WHITE, True),
             "yang": GameObject(x, y, "鞅", YELLOW, True),
-            "left_leg": GameObject(x-1, y+1, "腿", WHITE, True),
-            "right_leg": GameObject(x+1, y+1, "腿", WHITE, True)
+            "left_leg": GameObject(x - 1, y + 1, "腿", WHITE, True),
+            "right_leg": GameObject(x + 1, y + 1, "腿", WHITE, True)
         }
-        
+
         # 主位置（以"商"为中心）
         self.x = x
         self.y = y
@@ -53,7 +55,8 @@ class ShangYang:
         self.target_y = y
         self.fall_check_timer = 0
         self.fall_check_interval = 5  # 每5帧检查一次
-        self.big_jump_timer=0
+        self.big_jump_timer = 0
+
         # 游戏属性
         self.level = 1
         self.exp = 0
@@ -63,6 +66,7 @@ class ShangYang:
         self.move_speed = 0.3
         self.direction = "right"
         self.waiting_leg_recovery = False
+
         # 攻击系统
         self.unlocked_attacks = ["hand"]
         self.active_bullets = {
@@ -73,7 +77,7 @@ class ShangYang:
             "head": False
         }
         self.attack_cooldown = 0
-        
+
         # 重力系统
         self.gravity = 0.15
         self.vertical_velocity = 0
@@ -82,22 +86,22 @@ class ShangYang:
         self.super_jump_power = 2.5  # 强力跳跃力度
         self.on_ground = False
         self.ground_level = 0
-        
+
         # 跳跃冷却
         self.jump_cooldown = 0
-        
+
         # 新控制系统
         self.selected_part = "hand"  # 默认选择手
         self.available_parts = ["hand", "head", "leg"]  # 可选择的部位
         self.selected_index = 0  # 当前选择部位的索引
-        
+
         # 身体部位留在原地状态
         self.left_hand_original_pos = None
         self.right_hand_original_pos = None
         self.head_original_pos = None
         self.left_leg_original_pos = None
         self.right_leg_original_pos = None
-        
+
         # 部位是否分离状态
         self.parts_separated = {
             "left_hand": False,
@@ -106,22 +110,29 @@ class ShangYang:
             "left_leg": False,
             "right_leg": False
         }
-        
+
         # 攻击模式
         self.attack_mode = "horizontal"  # horizontal, vertical, super_jump
-        
+
         # 冷却时间
         self.q_cooldown = 0
         self.j_cooldown = 0
         self.r_cooldown = 0
-        
+
         # 攻击状态
         self.just_fired_bullet = False
         self.last_fired_bullet = None
-        
+
         # 移动状态
         self.is_airborne_without_legs = False
         self.airborne_movement_allowed = True
+
+        # 调试开关
+        self.debug_recovery = False
+
+    def debug_print(self, *args):
+        if self.debug_recovery:
+            print("[RECOVERY DEBUG]", *args)
 
     def check_trap_collision(self, game_world):
         """检查玩家任意身体部位是否碰到陷阱(火)"""
@@ -147,6 +158,7 @@ class ShangYang:
                     return True
 
         return False
+
     def check_below_empty(self, game_world):
         """检查当前支撑部位下方是否为空"""
         support_parts = self.get_support_parts()
@@ -165,47 +177,231 @@ class ShangYang:
                     return False
 
         return True
+
+    def is_part_colliding_at_position(self, part_name, player_x, player_y, game_world):
+        """检测指定部位在玩家位于(player_x, player_y)时是否与障碍重叠"""
+        if part_name not in self.body_parts:
+            self.debug_print(f"is_part_colliding_at_position: 未知部位 {part_name}")
+            return False
+
+        offsets = {
+            "head": (0, -2),
+            "shang": (0, -1),
+            "left_hand": (-1, -1),
+            "right_hand": (1, -1),
+            "yang": (0, 0),
+            "left_leg": (-1, 1),
+            "right_leg": (1, 1)
+        }
+
+        if part_name not in offsets:
+            self.debug_print(f"is_part_colliding_at_position: offsets里没有 {part_name}")
+            return False
+
+        offset_x, offset_y = offsets[part_name]
+        test_x = player_x + offset_x
+        test_y = player_y + offset_y
+
+        x_int = int(test_x)+1
+        y_int = int(test_y)+1
+
+        if 0 <= x_int < game_world.width and 0 <= y_int < game_world.height:
+            result = game_world.collision_grid[x_int][y_int] == 1
+            self.debug_print(
+                f"检测部位 {part_name}: 玩家中心=({player_x:.2f},{player_y:.2f}) "
+                f"部位坐标=({test_x:.2f},{test_y:.2f}) -> 格子=({x_int},{y_int}) 碰撞={result}"
+            )
+            return result
+
+        self.debug_print(
+            f"检测部位 {part_name}: 玩家中心=({player_x:.2f},{player_y:.2f}) "
+            f"部位坐标=({test_x:.2f},{test_y:.2f}) 越界，视为碰撞"
+        )
+        return True
+
+    def get_colliding_recovered_parts(self, game_world):
+        """获取当前回收后卡在障碍中的部位列表"""
+        colliding_parts = []
+
+        self.debug_print(f"开始检测回收后卡住部位，当前玩家中心=({self.x:.2f}, {self.y:.2f})")
+
+        for part_name, part in self.body_parts.items():
+            if not part.visible:
+                self.debug_print(f"跳过 {part_name}: 不可见")
+                continue
+            if self.parts_separated.get(part_name, False):
+                self.debug_print(f"跳过 {part_name}: 仍处于分离状态")
+                continue
+
+            if self.is_part_colliding_at_position(part_name, self.x, self.y, game_world):
+                colliding_parts.append(part_name)
+
+        self.debug_print(f"当前卡住部位列表: {colliding_parts}")
+        return colliding_parts
+
+    def force_shift_after_recovery(self, dx, dy, game_world):
+        """回收后用于脱困的强制整体位移，不走普通移动判定"""
+        old_x, old_y = self.x, self.y
+        new_x = self.x + dx
+        new_y = self.y + dy
+
+        min_x = 1
+        max_x = game_world.width - 2
+        min_y = 2
+        max_y = game_world.height - 2
+
+        new_x = max(min_x, min(new_x, max_x))
+        new_y = max(min_y, min(new_y, max_y))
+
+        self.debug_print(
+            f"强制位移: 原位置=({old_x:.2f},{old_y:.2f}) 位移=({dx},{dy}) "
+            f"目标=({new_x:.2f},{new_y:.2f})"
+        )
+
+        self.x = new_x
+        self.y = new_y
+        self.update_position(self.x, self.y)
+
+        self.debug_print(f"强制位移后位置=({self.x:.2f},{self.y:.2f})")
+        return True
+
+    def can_shift_to(self, new_x, new_y, game_world):
+        """检测整体移动到(new_x, new_y)后所有可见且未分离部位是否安全"""
+        for part_name, part in self.body_parts.items():
+            if not part.visible:
+                continue
+            if self.parts_separated.get(part_name, False):
+                continue
+
+            if self.is_part_colliding_at_position(part_name, new_x, new_y, game_world):
+                return False
+
+        return True
+
+    def resolve_recovery_stuck_by_symmetry(self, game_world):
+        """回收部位后若卡入障碍，按对称部位规则强制修正"""
+        self.debug_print("=== 进入 resolve_recovery_stuck_by_symmetry ===")
+
+        colliding_parts = self.get_colliding_recovered_parts(game_world)
+
+        if not colliding_parts:
+            self.debug_print("没有卡住部位，不需要修正")
+            return False
+
+        self.debug_print(f"检测到卡住部位: {colliding_parts}")
+
+        # 左腿卡，右腿不卡 -> 整体向右强制平移一格
+        if "left_leg" in colliding_parts:
+            right_leg_colliding = self.is_part_colliding_at_position("right_leg", self.x, self.y, game_world)
+            self.debug_print(f"分支判断: 左腿卡住，右腿是否卡住? {right_leg_colliding}")
+            if not right_leg_colliding:
+                self.debug_print("执行规则: 左腿卡 / 右腿不卡 -> 向右强制位移1格")
+                self.force_shift_after_recovery(1, 0, game_world)
+                return True
+
+        # 右腿卡，左腿不卡 -> 整体向左强制平移一格
+        if "right_leg" in colliding_parts:
+            left_leg_colliding = self.is_part_colliding_at_position("left_leg", self.x, self.y, game_world)
+            self.debug_print(f"分支判断: 右腿卡住，左腿是否卡住? {left_leg_colliding}")
+            if not left_leg_colliding:
+                self.debug_print("执行规则: 右腿卡 / 左腿不卡 -> 向左强制位移1格")
+                self.force_shift_after_recovery(-1, 0, game_world)
+                return True
+
+        # 左手卡，右手不卡 -> 整体向右强制平移一格
+        if "left_hand" in colliding_parts:
+            right_hand_colliding = self.is_part_colliding_at_position("right_hand", self.x, self.y, game_world)
+            self.debug_print(f"分支判断: 左手卡住，右手是否卡住? {right_hand_colliding}")
+            if not right_hand_colliding:
+                self.debug_print("执行规则: 左手卡 / 右手不卡 -> 向右强制位移1格")
+                self.force_shift_after_recovery(1, 0, game_world)
+                return True
+
+        # 右手卡，左手不卡 -> 整体向左强制平移一格
+        if "right_hand" in colliding_parts:
+            left_hand_colliding = self.is_part_colliding_at_position("left_hand", self.x, self.y, game_world)
+            self.debug_print(f"分支判断: 右手卡住，左手是否卡住? {left_hand_colliding}")
+            if not left_hand_colliding:
+                self.debug_print("执行规则: 右手卡 / 左手不卡 -> 向左强制位移1格")
+                self.force_shift_after_recovery(-1, 0, game_world)
+                return True
+
+        # 两腿都卡住，则看头是否安全，若头安全则向上强制位移一格
+        if "left_leg" in colliding_parts and "right_leg" in colliding_parts:
+            head_colliding = self.is_part_colliding_at_position("head", self.x, self.y, game_world)
+            self.debug_print(f"分支判断: 两腿都卡住，头是否卡住? {head_colliding}")
+            if not head_colliding:
+                self.debug_print("执行规则: 两腿都卡 / 头不卡 -> 向上强制位移1格")
+                self.force_shift_after_recovery(0, -1, game_world)
+                return True
+
+        self.debug_print("没有命中任何可执行修正规则")
+        return False
+
+    def resolve_recovery_stuck_loop(self, game_world, max_attempts=3):
+        """回收后重复尝试对称纠偏，避免一次位移不够"""
+        self.debug_print(f"=== 进入 resolve_recovery_stuck_loop，最多尝试 {max_attempts} 次 ===")
+
+        for i in range(max_attempts):
+            colliding_parts = self.get_colliding_recovered_parts(game_world)
+            self.debug_print(f"第 {i + 1} 次纠偏前，卡住部位: {colliding_parts}")
+
+            if not colliding_parts:
+                self.debug_print("已经没有卡住部位，纠偏成功")
+                return True
+
+            moved = self.resolve_recovery_stuck_by_symmetry(game_world)
+            self.debug_print(f"第 {i + 1} 次纠偏是否发生移动: {moved}")
+
+            if not moved:
+                self.debug_print("本次未能执行纠偏，提前结束")
+                return False
+
+        final_colliding = self.get_colliding_recovered_parts(game_world)
+        self.debug_print(f"纠偏结束后最终卡住部位: {final_colliding}")
+        return len(final_colliding) == 0
+
     def update_position(self, x, y):
         """更新玩家位置"""
         self.x = x
         self.y = y
-        
+
         # 只更新没有分离的身体部位
         if not self.parts_separated["head"]:
             self.body_parts["head"].x = x
-            self.body_parts["head"].y = y-2
-            
+            self.body_parts["head"].y = y - 2
+
         if not self.parts_separated["left_hand"]:
-            self.body_parts["left_hand"].x = x-1
-            self.body_parts["left_hand"].y = y-1
-            
+            self.body_parts["left_hand"].x = x - 1
+            self.body_parts["left_hand"].y = y - 1
+
         if not self.parts_separated["right_hand"]:
-            self.body_parts["right_hand"].x = x+1
-            self.body_parts["right_hand"].y = y-1
-            
+            self.body_parts["right_hand"].x = x + 1
+            self.body_parts["right_hand"].y = y - 1
+
         # 核心部分始终跟随
         self.body_parts["shang"].x = x
-        self.body_parts["shang"].y = y-1
-        
+        self.body_parts["shang"].y = y - 1
+
         self.body_parts["yang"].x = x
         self.body_parts["yang"].y = y
-        
+
         if not self.parts_separated["left_leg"]:
-            self.body_parts["left_leg"].x = x-1
-            self.body_parts["left_leg"].y = y+1
-            
+            self.body_parts["left_leg"].x = x - 1
+            self.body_parts["left_leg"].y = y + 1
+
         if not self.parts_separated["right_leg"]:
-            self.body_parts["right_leg"].x = x+1
-            self.body_parts["right_leg"].y = y+1
-        
+            self.body_parts["right_leg"].x = x + 1
+            self.body_parts["right_leg"].y = y + 1
+
         # 更新所有部位的矩形
         for part in self.body_parts.values():
             part.update_rect()
-    
+
     def set_ground_level(self, ground_level):
         """设置地面高度"""
         self.ground_level = ground_level
-    
+
     def get_collision_rects(self):
         """获取玩家所有碰撞矩形"""
         rects = []
@@ -213,44 +409,37 @@ class ShangYang:
             if part.visible:
                 rects.append(part.rect)
         return rects
-    
+
     def find_horizontal_collision_distance(self, target_x, game_world, direction):
         """查找水平方向最近的碰撞距离"""
         if direction == 0:
             return target_x
-            
-        # 计算从当前位置到目标位置的步进
+
         current_x = self.x
         step = 1 if target_x > current_x else -1
-        
-        # 逐步检查每个位置
+
         for test_x in range(int(current_x + step), int(target_x + step), int(step)):
             if self.check_horizontal_collision(test_x, game_world):
-                # 找到碰撞，返回碰撞前的位置
                 return test_x - step
-                
+
         return target_x
-    
+
     def find_vertical_collision_distance(self, target_y, game_world, direction):
         """查找垂直方向最近的碰撞距离"""
         if direction == 0:
             return target_y
-            
-        # 计算从当前位置到目标位置的步进
+
         current_y = self.y
         step = 1 if target_y > current_y else -1
-        
-        # 逐步检查每个位置
-        for test_y in range(int(current_y + step),int( target_y + step),int( step)):
+
+        for test_y in range(int(current_y + step), int(target_y + step), int(step)):
             if self.check_vertical_collision(test_y, game_world, direction < 0):
-                # 找到碰撞，返回碰撞前的位置
                 return test_y - step
-                
+
         return target_y
-    
+
     def check_horizontal_collision(self, test_x, game_world):
         """检查特定水平位置是否有碰撞"""
-        # 临时计算新位置
         temp_parts = {}
         for name, part in self.body_parts.items():
             if part.visible and not self.parts_separated.get(name, False):
@@ -260,21 +449,19 @@ class ShangYang:
                 new_part_y = self.y + offset_y
                 temp_rect = pygame.Rect(new_part_x * GRID_SIZE, new_part_y * GRID_SIZE, GRID_SIZE, GRID_SIZE)
                 temp_parts[name] = temp_rect
-        
-        # 检查与所有场景物体的碰撞
+
         for scene_obj in game_world.get_scene_objects():
             if not scene_obj.collidable:
                 continue
-                
+
             for part_name, part_rect in temp_parts.items():
                 if part_rect.colliderect(scene_obj.rect):
                     return True
-                    
+
         return False
-    
+
     def check_vertical_collision(self, test_y, game_world, check_up=False):
         """检查特定垂直位置是否有碰撞"""
-        # 临时计算新位置
         temp_parts = {}
         for name, part in self.body_parts.items():
             if part.visible and not self.parts_separated.get(name, False):
@@ -284,38 +471,34 @@ class ShangYang:
                 new_part_y = test_y + offset_y
                 temp_rect = pygame.Rect(new_part_x * GRID_SIZE, new_part_y * GRID_SIZE, GRID_SIZE, GRID_SIZE)
                 temp_parts[name] = temp_rect
-        
-        # 检查与所有场景物体的碰撞
+
         for scene_obj in game_world.get_scene_objects():
             if not scene_obj.collidable:
                 continue
-                
+
             for part_name, part_rect in temp_parts.items():
                 if part_rect.colliderect(scene_obj.rect):
                     return "up" if check_up else "down"
-                        
+
         return None
-    
+
     def select_next_part(self):
         """选择下一个部位"""
         if self.q_cooldown > 0:
             return
-            
+
         self.selected_index = (self.selected_index + 1) % len(self.available_parts)
         self.selected_part = self.available_parts[self.selected_index]
-        
-        # 根据选择的部位设置攻击模式
+
         if self.selected_part == "hand":
             self.attack_mode = "horizontal"
         elif self.selected_part == "head":
             self.attack_mode = "vertical"
         elif self.selected_part == "leg":
             self.attack_mode = "super_jump"
-        
-        # 重置身体部位颜色
+
         self.reset_body_part_colors()
-        
-        # 将选中的部位变绿
+
         if self.selected_part == "hand":
             if not self.parts_separated["left_hand"]:
                 self.body_parts["left_hand"].color = GREEN
@@ -329,9 +512,9 @@ class ShangYang:
                 self.body_parts["left_leg"].color = GREEN
             if not self.parts_separated["right_leg"]:
                 self.body_parts["right_leg"].color = GREEN
-        
-        self.q_cooldown = 3  # 选择冷却时间
-    
+
+        self.q_cooldown = 3
+
     def reset_body_part_colors(self):
         """重置所有身体部位的颜色"""
         if not self.parts_separated["head"]:
@@ -344,133 +527,113 @@ class ShangYang:
             self.body_parts["left_leg"].color = WHITE
         if not self.parts_separated["right_leg"]:
             self.body_parts["right_leg"].color = WHITE
-    
+
     def perform_action(self, game_world):
         """执行当前选中的动作"""
         if self.j_cooldown > 0:
             return False
-            
+
         action_performed = False
-        
+
         if self.attack_mode == "horizontal":
-            # 水平发射子弹
             action_performed = self.horizontal_attack(game_world)
             self.just_fired_bullet = True
         elif self.attack_mode == "vertical":
-            # 垂直发射子弹
             action_performed = self.vertical_attack(game_world)
             self.just_fired_bullet = True
         elif self.attack_mode == "super_jump":
-            # 强力跳跃
             action_performed = self.super_jump(game_world)
-            self.big_jump_timer=20
-        if action_performed:
-            self.j_cooldown = 15  # 动作冷却时间
+            self.big_jump_timer = 20
 
-            
+        if action_performed:
+            self.j_cooldown = 15
+
         return action_performed
-    
+
     def horizontal_attack(self, game_world):
         """水平发射子弹"""
         if not self.can_attack("hand", "left") or not self.can_attack("hand", "right"):
             return False
-            
-        # 发射左手 - 向左
-        bullet_left = Bullet(self.x-2, self.y-1, "hand", "left", self.level, self, "left")
-        
-        # 发射右手 - 向右
-        bullet_right = Bullet(self.x+2, self.y-1, "hand", "right", self.level, self, "right")
-        
-        # 设置最后发射的子弹
+
+        bullet_left = Bullet(self.x - 2, self.y - 1, "hand", "left", self.level, self, "left")
+        bullet_right = Bullet(self.x + 2, self.y - 1, "hand", "right", self.level, self, "right")
+
         self.last_fired_bullet = [bullet_left, bullet_right]
-        
-        # 设置子弹激活状态
+
         self.set_bullet_active("hand", "left", True)
         self.set_bullet_active("hand", "right", True)
-        
-        # 标记手部分离
+
         self.parts_separated["left_hand"] = True
         self.parts_separated["right_hand"] = True
-        
-        # 保存手的原始位置
+
         self.left_hand_original_pos = (self.body_parts["left_hand"].x, self.body_parts["left_hand"].y)
         self.right_hand_original_pos = (self.body_parts["right_hand"].x, self.body_parts["right_hand"].y)
-        
-        # 隐藏手部
+
         self.body_parts["left_hand"].visible = False
         self.body_parts["right_hand"].visible = False
-        
+
         return True
-    
+
     def vertical_attack(self, game_world):
         """垂直发射子弹"""
         if not self.can_attack("head"):
             return False
-            
-        # 发射头 - 向上
-        bullet = Bullet(self.x, self.y-3, "head", "up", self.level, self, None)
-        
-        # 设置最后发射的子弹
+
+        bullet = Bullet(self.x, self.y - 3, "head", "up", self.level, self, None)
+
         self.last_fired_bullet = bullet
-        
-        # 设置子弹激活状态
+
         self.set_bullet_active("head", None, True)
-        
-        # 标记头部分离
+
         self.parts_separated["head"] = True
-        
-        # 保存头的原始位置
+
         self.head_original_pos = (self.body_parts["head"].x, self.body_parts["head"].y)
-        
-        # 隐藏头部
+
         self.body_parts["head"].visible = False
-        
+
         return True
-    
+
     def get_fired_bullets(self):
         """获取刚刚发射的子弹"""
         if not self.just_fired_bullet or not self.last_fired_bullet:
             return []
-            
+
         bullets = []
         if isinstance(self.last_fired_bullet, list):
             bullets.extend(self.last_fired_bullet)
         else:
             bullets.append(self.last_fired_bullet)
-            
+
         self.just_fired_bullet = False
         return bullets
+
     def super_jump(self, game_world):
         """强力跳跃 - 腿留在原地"""
         if not self.on_ground or self.jump_cooldown > 0 or self.has_legs_separated():
             return False
-            
-        # 标记腿部分离
+
         self.parts_separated["left_leg"] = True
         self.parts_separated["right_leg"] = True
-        
-        # 保存腿的原始位置
+
         self.left_leg_original_pos = (self.body_parts["left_leg"].x, self.body_parts["left_leg"].y)
         self.right_leg_original_pos = (self.body_parts["right_leg"].x, self.body_parts["right_leg"].y)
-        
-        # 隐藏腿
+
         self.body_parts["left_leg"].visible = False
         self.body_parts["right_leg"].visible = False
-        
-        # 执行强力跳跃
+
         self.is_jumping = True
         self.is_airborne_without_legs = True
         self.airborne_movement_allowed = True
         self.on_ground = False
         self.vertical_velocity = -self.super_jump_power
         self.jump_cooldown = 20
-        
+
         return True
-    
+
     def has_legs_separated(self):
         """检查腿是否已经分离"""
         return self.parts_separated["left_leg"] and self.parts_separated["right_leg"]
-    
+
     def check_leg_auto_recover(self, game_world):
         """检查是否应该自动回收腿"""
         if not self.has_legs_separated():
@@ -478,96 +641,95 @@ class ShangYang:
         if self.big_jump_timer > 0:
             return False
 
-        # 计算腿的原始位置
         left_leg_x, left_leg_y = self.left_leg_original_pos
         right_leg_x, right_leg_y = self.right_leg_original_pos
-        
-        # 计算玩家的当前位置
+
         player_x = self.x
         player_y = self.y
-        
-        # 检查是否落在左腿位置
-        if (abs(player_x - left_leg_x) <= 2 and 
-            abs(player_y - left_leg_y) <= 2):
+
+        if abs(player_x - left_leg_x) <= 2 and abs(player_y - left_leg_y) <= 2:
             return True
-        
-        # 检查是否落在右腿位置
-        if (abs(player_x - right_leg_x) <= 2 and 
-            abs(player_y - right_leg_y) <= 2):
+
+        if abs(player_x - right_leg_x) <= 2 and abs(player_y - right_leg_y) <= 2:
             return True
-        
-        # 检查是否落在两腿中间位置
-        if (abs(player_x - (left_leg_x + right_leg_x) / 2) <= 2 and
-            abs(player_y - (left_leg_y + right_leg_y) / 2) <= 2):
+
+        if abs(player_x - (left_leg_x + right_leg_x) / 2) <= 2 and abs(player_y - (left_leg_y + right_leg_y) / 2) <= 2:
             return True
-        
+
         return False
-    
+
     def check_foot_collision_after_recovery(self, new_y, game_world):
         """检查回收腿后是否会与脚下障碍碰撞"""
-        # 模拟回收腿后的位置
         temp_y = new_y
-        
-        # 创建临时腿部对象
-        left_leg_temp = GameObject(self.x-1, temp_y+1, "腿", WHITE, True)
-        right_leg_temp = GameObject(self.x+1, temp_y+1, "腿", WHITE, True)
-        
-        # 检查腿部是否与场景物体碰撞
+
+        left_leg_temp = GameObject(self.x - 1, temp_y + 1, "腿", WHITE, True)
+        right_leg_temp = GameObject(self.x + 1, temp_y + 1, "腿", WHITE, True)
+
         for scene_obj in game_world.get_scene_objects():
             if not scene_obj.collidable:
                 continue
-                
+
             if left_leg_temp.rect.colliderect(scene_obj.rect) or right_leg_temp.rect.colliderect(scene_obj.rect):
                 return True
-                
+
         return False
+
     def start_leg_recovery_jump(self, game_world):
         """开始腿部回收流程：先执行小跳，等到最高点再真正回收腿"""
+        self.debug_print("=== 调用 start_leg_recovery_jump ===")
+
         if self.r_cooldown > 0:
+            self.debug_print(f"start_leg_recovery_jump: r_cooldown={self.r_cooldown}，不能开始")
             return False
 
         if not self.parts_separated["left_leg"] and not self.parts_separated["right_leg"]:
+            self.debug_print("start_leg_recovery_jump: 没有分离的腿")
             return False
 
-        # 已经在等待回收中，就不要重复触发
         if self.waiting_leg_recovery:
+            self.debug_print("start_leg_recovery_jump: 已在等待腿回收")
             return False
 
-        # 检查头顶是否有障碍
-        collision_result = self.check_vertical_collision(self.y - 1, game_world, True)
-        if collision_result == "up":
-            return False
+        # collision_result = self.check_vertical_collision(self.y - 1, game_world, True)
+        # self.debug_print(f"start_leg_recovery_jump: 头顶检测结果={collision_result}")
+        # if collision_result == "up":
+        #     self.debug_print("start_leg_recovery_jump: 头顶有障碍，不能起跳")
+        #     return False
 
         self.waiting_leg_recovery = True
         self.r_cooldown = 20
         self.is_airborne_without_legs = False
         self.airborne_movement_allowed = False
 
-        # 执行小跳
         small_jump_power = self.jump_power * 0.5
         self.is_jumping = True
         self.on_ground = False
         self.vertical_velocity = -small_jump_power
         self.jump_cooldown = 5
 
+        self.debug_print(f"start_leg_recovery_jump: 启动成功，vertical_velocity={self.vertical_velocity}")
         return True
+
     def finish_leg_recovery(self, game_world):
         """在小跳最高点真正回收腿"""
+        self.debug_print("=== 调用 finish_leg_recovery ===")
+
         if not self.waiting_leg_recovery:
+            self.debug_print("finish_leg_recovery: waiting_leg_recovery=False，直接返回")
             return False
 
         recovered = False
 
-        # 回收左腿
         if self.parts_separated["left_leg"]:
+            self.debug_print("回收左腿")
             self.parts_separated["left_leg"] = False
             self.set_bullet_active("leg", "left", False)
             self.body_parts["left_leg"].visible = True
             self.body_parts["left_leg"].color = GREEN if self.selected_part == "leg" else WHITE
             recovered = True
 
-        # 回收右腿
         if self.parts_separated["right_leg"]:
+            self.debug_print("回收右腿")
             self.parts_separated["right_leg"] = False
             self.set_bullet_active("leg", "right", False)
             self.body_parts["right_leg"].visible = True
@@ -575,110 +737,138 @@ class ShangYang:
             recovered = True
 
         if recovered:
+            self.debug_print("finish_leg_recovery: 腿已回收，开始更新位置并纠偏")
             self.update_position(self.x, self.y)
 
-            # 回收后如果腿和障碍重叠，尝试修正
-            if self.check_foot_collision_after_recovery(self.y, game_world):
+            self.debug_print(f"回收腿后当前位置=({self.x:.2f}, {self.y:.2f})")
+            self.debug_print(f"回收腿后卡住检测={self.get_colliding_recovered_parts(game_world)}")
+
+            fixed = self.resolve_recovery_stuck_loop(game_world, max_attempts=3)
+
+            self.debug_print(f"腿回收后的对称纠偏结果 fixed={fixed}")
+            self.debug_print(f"纠偏后位置=({self.x:.2f}, {self.y:.2f})")
+            self.debug_print(f"纠偏后卡住检测={self.get_colliding_recovered_parts(game_world)}")
+
+            if not fixed and self.check_foot_collision_after_recovery(self.y, game_world):
+                self.debug_print("对称纠偏失败，进入 adjust_position_after_leg_recovery")
                 self.adjust_position_after_leg_recovery(game_world)
 
         self.waiting_leg_recovery = False
-        return recovered    
+        return recovered
+
     def perform_leg_recovery_jump(self, game_world):
         """执行腿部回收时的小跳跃"""
-        # 小跳跃高度是正常跳跃的一半
         small_jump_power = self.jump_power * 0.5
-        
-        # 检查头顶是否有障碍
+
         collision_result = self.check_vertical_collision(self.y - 1, game_world, True)
         if collision_result == "up":
-            # 头顶有障碍，不跳跃
             return False
-        
-        # 执行小跳跃
+
         self.is_jumping = True
         self.on_ground = False
         self.vertical_velocity = -small_jump_power
-        self.jump_cooldown = 5  # 短冷却时间
-        
+        self.jump_cooldown = 5
+
         return True
-    
+
     def adjust_position_after_leg_recovery(self, game_world):
         """腿部回收后调整位置避免碰撞"""
-        # 如果回收后腿和地面重叠，向上调整位置
+        self.debug_print("=== 进入 adjust_position_after_leg_recovery ===")
         adjustment_made = False
-        
-        # 最多尝试向上调整5格
+
         for adjust in range(1, 6):
             test_y = self.y - adjust
-            
-            # 检查这个位置是否安全
-            if not self.check_foot_collision_after_recovery(test_y, game_world):
-                # 找到安全位置
+            result = self.check_foot_collision_after_recovery(test_y, game_world)
+            self.debug_print(f"尝试向上调整 {adjust} 格 -> test_y={test_y:.2f}, 是否碰脚={result}")
+
+            if not result:
                 self.y = test_y
                 self.update_position(self.x, self.y)
                 adjustment_made = True
+                self.debug_print(f"找到安全位置，调整后=({self.x:.2f},{self.y:.2f})")
                 break
-        
+
         if not adjustment_made:
-            # 如果找不到安全位置，尝试向上小跳
+            self.debug_print("没找到安全位置，尝试执行小跳")
             self.perform_leg_recovery_jump(game_world)
 
-    def recover_all_parts(self,game_world):
-
+    def recover_all_parts(self, game_world):
         """回收所有身体部位：手和头立即回收，腿先小跳到最高点再回收"""
+        self.debug_print("=== 调用 recover_all_parts ===")
+        self.debug_print(f"回收前位置=({self.x:.2f}, {self.y:.2f})")
+        self.debug_print(f"当前分离状态={self.parts_separated}")
+
         if self.r_cooldown > 0:
+            self.debug_print(f"recover_all_parts: r_cooldown={self.r_cooldown}，不能回收")
             return False
 
         recovered = False
 
-        # 回收左手
         if self.parts_separated["left_hand"]:
+            self.debug_print("回收左手")
             self.parts_separated["left_hand"] = False
             self.set_bullet_active("hand", "left", False)
             self.body_parts["left_hand"].visible = True
             self.body_parts["left_hand"].color = GREEN if self.selected_part == "hand" else WHITE
             recovered = True
 
-        # 回收右手
         if self.parts_separated["right_hand"]:
+            self.debug_print("回收右手")
             self.parts_separated["right_hand"] = False
             self.set_bullet_active("hand", "right", False)
             self.body_parts["right_hand"].visible = True
             self.body_parts["right_hand"].color = GREEN if self.selected_part == "hand" else WHITE
             recovered = True
 
-        # 回收头部
         if self.parts_separated["head"]:
+            self.debug_print("回收头")
             self.parts_separated["head"] = False
             self.set_bullet_active("head", None, False)
             self.body_parts["head"].visible = True
             self.body_parts["head"].color = GREEN if self.selected_part == "head" else WHITE
             recovered = True
 
-        # 腿不要立刻回收，改成启动延迟回收流程
         leg_recovery_started = False
         if self.parts_separated["left_leg"] or self.parts_separated["right_leg"]:
+            self.debug_print("尝试启动腿部延迟回收")
             leg_recovery_started = self.start_leg_recovery_jump(game_world)
+            self.debug_print(f"腿部延迟回收是否启动成功: {leg_recovery_started}")
             if leg_recovery_started:
                 recovered = True
 
-        # 如果只回收了手/头，没有启动腿部延迟回收，也要给冷却
         if recovered and not leg_recovery_started:
+            self.debug_print("只回收了手/头，设置回收冷却")
             self.r_cooldown = 20
             self.is_airborne_without_legs = False
             self.airborne_movement_allowed = False
 
+        if recovered:
+            self.update_position(self.x, self.y)
+            self.debug_print(f"recover_all_parts: 更新位置后=({self.x:.2f}, {self.y:.2f})")
+            self.debug_print(f"recover_all_parts: 当前卡住部位={self.get_colliding_recovered_parts(game_world)}")
+
+            fixed = self.resolve_recovery_stuck_loop(game_world, max_attempts=3)
+
+            self.debug_print(f"recover_all_parts: 对称纠偏结果 fixed={fixed}")
+            self.debug_print(f"recover_all_parts: 纠偏后位置=({self.x:.2f}, {self.y:.2f})")
+            self.debug_print(f"recover_all_parts: 纠偏后卡住部位={self.get_colliding_recovered_parts(game_world)}")
+
+            if not fixed:
+                colliding_parts = self.get_colliding_recovered_parts(game_world)
+                if "left_leg" in colliding_parts or "right_leg" in colliding_parts:
+                    self.debug_print("recover_all_parts: 腿仍卡住，进入 adjust_position_after_leg_recovery")
+                    self.adjust_position_after_leg_recovery(game_world)
+
         return recovered
+
     def can_move(self):
         """检查是否可以移动"""
-        # 如果两条腿都分离，但在空中时可以移动
- 
         if self.has_legs_separated():
             if not self.on_ground and self.airborne_movement_allowed:
                 return True
             return False
         return True
-    
+
     def move(self, dx, dy, game_world):
         """移动玩家 - 只计算目标位置，不实际移动"""
         if self.check_leg_auto_recover(game_world):
@@ -686,24 +876,22 @@ class ShangYang:
 
         if not self.can_move():
             return False
-        
+
         new_x = self.x + dx
         new_y = self.y + dy
-        
-        # 边界检查
+
         min_x = 1
         max_x = (game_world.width - 2)
         min_y = 2
         max_y = (game_world.height - 2)
-        
-        # 应用边界限制
+
         new_x = max(min_x, min(new_x, max_x))
         new_y = max(min_y, min(new_y, max_y))
-        
-        # 存储目标位置
+
         self.target_x = new_x
         self.target_y = new_y
         return True
+
     def jump(self, game_world):
         """普通跳跃"""
         if not self.can_move() or not self.is_jumping and self.on_ground and self.jump_cooldown <= 0:
@@ -716,47 +904,41 @@ class ShangYang:
 
     def apply_gravity(self, game_world):
         """应用重力 - 只计算目标位置，不实际移动"""
-        # 更新坠落检查计时器
         if self.fall_check_timer > 0:
             self.fall_check_timer -= 1
-        
-        # 检查腿是否分离
+
         legs_separated = self.has_legs_separated()
-        
-        # 如果玩家在地面上，检查是否需要开始下坠
+
         if self.on_ground and self.fall_check_timer <= 0 and not legs_separated:
             if self.check_below_empty(game_world):
                 self.on_ground = False
                 self.is_jumping = False
                 self.vertical_velocity = 0
             self.fall_check_timer = self.fall_check_interval
-        
+
         if not self.on_ground:
-                # 应用重力
             self.vertical_velocity += self.gravity
             target_y = self.y + self.vertical_velocity
-            
-            # 边界检查
+
             min_y = 2
             max_y = (game_world.height - 2)
             target_y = max(min_y, min(target_y, max_y))
-            
-            # 存储目标位置
+
             if target_y != self.y:
                 self.target_y = target_y
-        
-        # 更新跳跃冷却
+
         if self.jump_cooldown > 0:
             self.jump_cooldown -= 1
+
     def check_endpoint_collision(self, game_world):
         """检查是否到达终点"""
         for obj in game_world.get_scene_objects():
             if hasattr(obj, 'char') and obj.char == "终" and isinstance(obj, EndPoint):
-                # 检查玩家任意部位是否与终点碰撞
                 for part_name, part in self.body_parts.items():
                     if part.visible and part.collides_with(obj):
                         return True
         return False
+
     def update_move(self, game_world=None):
         if game_world is None:
             return False
@@ -785,11 +967,9 @@ class ShangYang:
             next_x = current_x + step_dx
             next_y = current_y + step_dy
 
-            # 先测水平
             if self.check_step_collision(next_x, current_y, 1 if step_dx > 0 else -1 if step_dx < 0 else 0, 0, game_world) is None:
                 current_x = next_x
 
-            # 再测垂直
             collision_result = self.check_step_collision(current_x, next_y, 0, 1 if step_dy > 0 else -1 if step_dy < 0 else 0, game_world)
             if collision_result is None:
                 current_y = next_y
@@ -813,6 +993,7 @@ class ShangYang:
         self.target_x = None
         self.target_y = None
         return moved
+
     def move_horizontal_stepwise(self, dx, game_world):
         """连续水平移动，但沿路径做小步长碰撞检测"""
         if dx == 0:
@@ -837,7 +1018,6 @@ class ShangYang:
             current_x = next_x
             moved = True
 
-        # 最后一小段
         if abs(target_x - current_x) > 1e-6:
             collision_result = self.check_step_collision(target_x, self.y, direction, 0, game_world)
 
@@ -850,6 +1030,7 @@ class ShangYang:
             self.update_position(self.x, self.y)
 
         return moved
+
     def move_vertical_stepwise(self, dy, game_world):
         """连续垂直移动，但沿路径做小步长碰撞检测"""
         if dy == 0:
@@ -882,7 +1063,6 @@ class ShangYang:
             current_y = next_y
             moved = True
 
-        # 最后一小段
         if abs(target_y - current_y) > 1e-6:
             collision_result = self.check_step_collision(self.x, target_y, 0, direction, game_world)
 
@@ -920,6 +1100,7 @@ class ShangYang:
                 if part.visible and not self.parts_separated.get(name, False):
                     parts.append(name)
         return parts
+
     def get_support_parts(self):
         """返回当前负责落地的部位：有腿时腿着地，无腿时鞅着地"""
         parts = []
@@ -932,7 +1113,6 @@ class ShangYang:
         if parts:
             return parts
 
-        # 没腿时，鞅负责着地
         if not self.parts_separated.get("yang", False) and self.body_parts["yang"].visible:
             return ["yang"]
 
@@ -947,7 +1127,7 @@ class ShangYang:
         return parts
 
     def get_upward_collision_parts(self):
-        """向上碰撞：所有当前存在的部位都可参与，或者你也可以只取上半身"""
+        """向上碰撞：所有当前存在的部位都可参与"""
         parts = []
         for name, part in self.body_parts.items():
             if part.visible and not self.parts_separated.get(name, False):
@@ -957,16 +1137,21 @@ class ShangYang:
     def check_step_collision(self, test_x, test_y, dx, dy, game_world):
         """检查从当前位置到测试位置这一步是否会碰撞"""
         if dy > 0:
-            check_parts = self.get_support_parts()              # 向下：只看支撑部位
+            check_parts = self.get_support_parts()
         elif dy < 0:
-            check_parts = self.get_upward_collision_parts()    # 向上：看现存部位
+            check_parts = self.get_upward_collision_parts()
         else:
-            check_parts = self.get_horizontal_collision_parts() # 水平：看现存部位
+            check_parts = self.get_horizontal_collision_parts()
+
+        self.debug_print(
+            f"check_step_collision: test=({test_x:.2f},{test_y:.2f}) dx={dx} dy={dy} 检测部位={check_parts}"
+        )
 
         for name in check_parts:
             part = self.body_parts[name]
 
             if not part.visible or self.parts_separated.get(name, False):
+                self.debug_print(f"check_step_collision: 跳过 {name}")
                 continue
 
             offset_x = part.x - self.x
@@ -974,11 +1159,20 @@ class ShangYang:
             test_part_x = test_x + offset_x
             test_part_y = test_y + offset_y
 
-            part_x_int = int(test_part_x)+1
-            part_y_int = int(test_part_y)+1
+            raw_x_int = int(test_part_x)
+            raw_y_int = int(test_part_y)
+
+            part_x_int = int(test_part_x) + 1
+            part_y_int = int(test_part_y) + 1
+
+            self.debug_print(
+                f"check_step_collision: 部位={name} 部位测试坐标=({test_part_x:.2f},{test_part_y:.2f}) "
+                f"raw格=({raw_x_int},{raw_y_int}) 当前实际检测格=({part_x_int},{part_y_int})"
+            )
 
             if 0 <= part_x_int < game_world.width and 0 <= part_y_int < game_world.height:
                 if game_world.collision_grid[part_x_int][part_y_int] == 1:
+                    self.debug_print(f"check_step_collision: 部位 {name} 撞上了格子 ({part_x_int},{part_y_int})")
                     if dx > 0:
                         return "left"
                     elif dx < 0:
@@ -987,12 +1181,13 @@ class ShangYang:
                         return "top"
                     elif dy < 0:
                         return "bottom"
+            else:
+                self.debug_print(f"check_step_collision: 部位 {name} 检测越界 ({part_x_int},{part_y_int})")
 
         return None
 
     def update(self, game_world=None):
         """更新玩家状态"""
-        # 更新冷却时间
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
         if self.q_cooldown > 0:
@@ -1001,9 +1196,9 @@ class ShangYang:
             self.j_cooldown -= 1
         if self.r_cooldown > 0:
             self.r_cooldown -= 1
-        if self.big_jump_timer>0:
-            self.big_jump_timer -=1
-        # 应用重力
+        if self.big_jump_timer > 0:
+            self.big_jump_timer -= 1
+
         if game_world:
             self.apply_gravity(game_world)
         self.update_move(game_world)
@@ -1023,7 +1218,7 @@ class ShangYang:
                 self.body_parts["right_leg"].visible = not is_active
             elif part_name == "head":
                 self.body_parts["head"].visible = not is_active
-    
+
     def can_attack(self, bullet_type, side=None):
         """检查是否可以发射指定部位的子弹"""
         if bullet_type == "hand":
@@ -1039,7 +1234,7 @@ class ShangYang:
         elif bullet_type == "head":
             return not self.active_bullets["head"] and not self.parts_separated["head"]
         return False
-    
+
     def set_bullet_active(self, bullet_type, side, active):
         """设置子弹激活状态"""
         if bullet_type == "hand":
@@ -1057,8 +1252,8 @@ class ShangYang:
 
     def attack(self, bullets, game_world):
         """兼容旧的攻击方法"""
-        return False  # 现在通过perform_action方法攻击
-    
+        return False
+
     def recover_part(self, bullet_type, side=None):
         """回收身体部位 - 子弹击中目标时调用"""
         if bullet_type == "hand":
@@ -1066,7 +1261,6 @@ class ShangYang:
                 self.parts_separated["left_hand"] = False
                 self.set_bullet_active("hand", "left", False)
                 self.body_parts["left_hand"].visible = True
-                # 恢复颜色
                 if self.selected_part == "hand":
                     self.body_parts["left_hand"].color = GREEN
                 else:
@@ -1075,7 +1269,6 @@ class ShangYang:
                 self.parts_separated["right_hand"] = False
                 self.set_bullet_active("hand", "right", False)
                 self.body_parts["right_hand"].visible = True
-                # 恢复颜色
                 if self.selected_part == "hand":
                     self.body_parts["right_hand"].color = GREEN
                 else:
@@ -1085,7 +1278,6 @@ class ShangYang:
                 self.parts_separated["left_leg"] = False
                 self.set_bullet_active("leg", "left", False)
                 self.body_parts["left_leg"].visible = True
-                # 恢复颜色
                 if self.selected_part == "leg":
                     self.body_parts["left_leg"].color = GREEN
                 else:
@@ -1094,7 +1286,6 @@ class ShangYang:
                 self.parts_separated["right_leg"] = False
                 self.set_bullet_active("leg", "right", False)
                 self.body_parts["right_leg"].visible = True
-                # 恢复颜色
                 if self.selected_part == "leg":
                     self.body_parts["right_leg"].color = GREEN
                 else:
@@ -1103,18 +1294,17 @@ class ShangYang:
             self.parts_separated["head"] = False
             self.set_bullet_active("head", None, False)
             self.body_parts["head"].visible = True
-            # 恢复颜色
             if self.selected_part == "head":
                 self.body_parts["head"].color = GREEN
             else:
                 self.body_parts["head"].color = WHITE
-    
+
     def gain_exp(self, amount):
         """获得经验值"""
         self.exp += amount
         if self.exp >= self.exp_to_next_level:
             self.level_up()
-    
+
     def level_up(self):
         """升级"""
         self.level += 1
@@ -1122,17 +1312,17 @@ class ShangYang:
         self.exp_to_next_level = int(self.exp_to_next_level * 1.5)
         self.max_health += 2
         self.health = self.max_health
-        
+
         if self.level == 2 and "leg" not in self.unlocked_attacks:
             self.unlocked_attacks.append("leg")
         elif self.level >= 3 and "head" not in self.unlocked_attacks:
             self.unlocked_attacks.append("head")
-        # 解锁新的可用部位
+
         if self.level == 2 and "leg" not in self.available_parts:
             self.available_parts.append("leg")
         elif self.level >= 3 and "head" not in self.available_parts:
             self.available_parts.append("head")
-    
+
     def get_selected_part_info(self):
         """获取当前选中部位的信息"""
         if self.selected_part == "hand":
@@ -1142,7 +1332,7 @@ class ShangYang:
         elif self.selected_part == "leg":
             return "腿（强力跳跃）"
         return "未知"
-    
+
     def get_separated_parts_info(self):
         """获取分离部位的信息"""
         separated = []
@@ -1157,28 +1347,20 @@ class ShangYang:
         if self.parts_separated["right_leg"]:
             separated.append("右腿")
         return separated
-    
+
     def draw(self, screen, font):
         """绘制玩家"""
-        # 绘制留在原地的身体部位
-
-            
         if self.parts_separated["left_leg"] and self.left_leg_original_pos:
             left_leg = GameObject(self.left_leg_original_pos[0], self.left_leg_original_pos[1], "腿", WHITE)
             left_leg.draw(screen, font)
-            
+
         if self.parts_separated["right_leg"] and self.right_leg_original_pos:
-            right_leg = GameObject(self.right_leg_original_pos[0], self.right_leg_original_pos[1], "腿",WHITE)
+            right_leg = GameObject(self.right_leg_original_pos[0], self.right_leg_original_pos[1], "腿", WHITE)
             right_leg.draw(screen, font)
-        
-        # 绘制所有身体部位
+
         for part in self.body_parts.values():
             part.draw(screen, font)
-        
-        # 绘制状态信息
+
         level_font = pygame.font.SysFont(None, 20)
-        
-        # 等级
         level_text = level_font.render(f"Lv.{self.level}", True, CYAN)
-        screen.blit(level_text, (self.x * GRID_SIZE, (self.y-2) * GRID_SIZE - 20))
-        
+        screen.blit(level_text, (self.x * GRID_SIZE, (self.y - 2) * GRID_SIZE - 20))

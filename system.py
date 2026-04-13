@@ -359,11 +359,6 @@ class TankGame:
             dx -= self.player.move_speed
         if keys[pygame.K_d]:  # 右
             dx += self.player.move_speed
-        # if keys[pygame.K_w]:  # 上
-        #     dy -= 1
-        # if keys[pygame.K_s]:  # 下
-        #     dy += 1
-        print(f"玩家移动: dx={dx}, dy={dy}")
         self.player.move(dx, dy, self.world)
 
         # 按住空格键连续发射
@@ -386,7 +381,6 @@ class TankGame:
 
 
         if self.player.check_endpoint_collision(self.world):
-            print(self.level)
             if self.level < MAX_LEVEL:  # 假设最大5关
                 self.state = GAME_STATE_VICTORY
                 self.show_message(f"恭喜通过第{self.level}关！按N进入下一关，按ESC返回菜单", 300)
