@@ -14,7 +14,7 @@ class UI:
     """UI界面类"""
     def __init__(self):
         self.screen = None
-        self.font = pygame.font.SysFont("simhei", 24)
+        self.font = pygame.font.SysFont("simhei", 20)
         self.small_font = pygame.font.SysFont("simhei", 20)
         self.title_font = pygame.font.SysFont("simhei", 36, bold=True)
         self.big_font = pygame.font.SysFont("simhei", 72, bold=True)

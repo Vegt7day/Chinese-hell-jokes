@@ -3,6 +3,7 @@
 """
 
 import pygame
+import sys
 import random
 from __init__ import FPS,MAX_LEVEL,GAME_STATE_MENU,SCREEN_WIDTH, SCREEN_HEIGHT,GRID_SIZE, BLACK, GAME_STATE_PLAYING, GAME_STATE_GAME_OVER, GAME_STATE_VICTORY
 from player import ShangYang
@@ -16,7 +17,7 @@ class GameSystem:
     def __init__(self):
         # 初始化屏幕
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("文字版坦克大战 - 商鞅 vs 马")
+        pygame.display.set_caption("文字地狱大战")
         
         # 初始化UI
         self.ui = UI()

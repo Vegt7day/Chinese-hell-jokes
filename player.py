@@ -128,7 +128,7 @@ class ShangYang:
         self.airborne_movement_allowed = True
 
         # 调试开关
-        self.debug_recovery = False
+        self.debug_recovery = True
 
     def debug_print(self, *args):
         if self.debug_recovery:
@@ -468,7 +468,7 @@ class ShangYang:
                 offset_x = part.x - self.x
                 offset_y = part.y - self.y
                 new_part_x = self.x + offset_x
-                new_part_y = test_y + offset_y
+                new_part_y = test_y + offset_y+1
                 temp_rect = pygame.Rect(new_part_x * GRID_SIZE, new_part_y * GRID_SIZE, GRID_SIZE, GRID_SIZE)
                 temp_parts[name] = temp_rect
 
@@ -1162,12 +1162,51 @@ class ShangYang:
             raw_x_int = int(test_part_x)
             raw_y_int = int(test_part_y)
 
-            part_x_int = int(test_part_x) + 1
-            part_y_int = int(test_part_y) + 1
+            x_bias = 0
+            y_bias = 0
+
+            # 水平移动时的接触面
+            if dx > 0:          # 向右
+                x_bias = 1
+            elif dx < 0:        # 向左
+                x_bias = 0
+            
+            # 垂直移动时的接触面
+            if dy >0:          # 向下
+                y_bias = 1
+                
+                # 关键修正：
+                # 向上时，左右侧部位需要按自身所在侧修正x检测
+                if offset_x < 0:      # 左手 / 左脚
+                    x_bias = 0
+                elif offset_x > 0:    # 右手 / 右脚
+                    x_bias = 1
+                else:                 # 头 / 商 / 鞅
+                    x_bias = 0
+
+            elif dy < 0:        # 向上
+                y_bias = 0
+
+                # 关键修正：
+                # 向上时，左右侧部位需要按自身所在侧修正x检测
+                if offset_x < 0:      # 左手 / 左脚
+                    x_bias = 0
+                elif offset_x > 0:    # 右手 / 右脚
+                    x_bias = 1
+                else:                 # 头 / 商 / 鞅
+                    x_bias = 0
+            else:
+                y_bias = 1
+            part_x_int = int(test_part_x) + x_bias
+            part_y_int = int(test_part_y) + y_bias
 
             self.debug_print(
-                f"check_step_collision: 部位={name} 部位测试坐标=({test_part_x:.2f},{test_part_y:.2f}) "
-                f"raw格=({raw_x_int},{raw_y_int}) 当前实际检测格=({part_x_int},{part_y_int})"
+                f"check_step_collision: 部位={name} "
+                f"部位测试坐标=({test_part_x:.2f},{test_part_y:.2f}) "
+                f"raw格=({raw_x_int},{raw_y_int}) "
+                f"offset_x={offset_x:.2f} offset_y={offset_y:.2f} "
+                f"bias=({x_bias},{y_bias}) "
+                f"当前实际检测格=({part_x_int},{part_y_int})"
             )
 
             if 0 <= part_x_int < game_world.width and 0 <= part_y_int < game_world.height:
